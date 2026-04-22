@@ -18,4 +18,9 @@
 - Added a sample dataset at `data/eval_cases.jsonl` with 20 cases across multiple scenarios.
 - Added dataset tests for success and failure paths.
 - Verified editable install and passed `23` tests in the Conda environment.
+- Applied initial review fixes:
+  - completed runtime/test dependencies in `pyproject.toml`
+  - removed evaluator module `reload()` from normal discovery flow
+  - reset evaluator module cache only in test-oriented `clear_registry()`
+  - documented the `RunConfig.model_config` alias decision inline
 - Next implementation target: Provider layer, then storage and execution flow.

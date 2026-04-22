@@ -86,6 +86,8 @@ class RunConfig(BaseModel):
     run_id: str
     dataset_path: str
     provider_name: str
+    # `model_config` is a reserved Pydantic v2 name, so we keep the external
+    # API field via alias while using a safe internal attribute name.
     provider_model_config: dict[str, Any] = Field(
         default_factory=dict,
         alias="model_config",

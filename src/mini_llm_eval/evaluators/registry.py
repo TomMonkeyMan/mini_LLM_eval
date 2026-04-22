@@ -55,13 +55,15 @@ def auto_discover(package_name: str | None = None) -> None:
         if module_name.startswith("_") or module_name in {"base", "registry"}:
             continue
         qualified_name = f"{target_package}.{module_name}"
-        if qualified_name in sys.modules:
-            importlib.reload(sys.modules[qualified_name])
-        else:
+        if qualified_name not in sys.modules:
             importlib.import_module(qualified_name)
 
 
-def clear_registry() -> None:
-    """Reset the in-memory registry. Intended for tests."""
+def clear_registry(package_name: str = "mini_llm_eval.evaluators") -> None:
+    """Reset the in-memory registry and evaluator module cache for tests."""
 
     _EVALUATORS.clear()
+    prefix = f"{package_name}."
+    for module_name in list(sys.modules):
+        if module_name.startswith(prefix) and module_name.split(".")[-1] not in {"base", "registry"}:
+            sys.modules.pop(module_name, None)
