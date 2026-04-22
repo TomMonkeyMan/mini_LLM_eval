@@ -222,6 +222,49 @@ python run_eval.py --resume run_20240422_abc123
 python run_eval.py --dataset ... --run-id my_experiment_v1
 ```
 
+**Run 状态机（参考 raw requirement 方向 A）：**
+
+```
+提交 job → 队列 (PENDING) → Worker 取出 (RUNNING) → 完成 (SUCCEEDED/FAILED)
+                                    ↓
+                               取消 (CANCELLED)
+```
+
+| 状态 | 说明 |
+|------|------|
+| PENDING | 任务已创建，进入队列，等待执行 |
+| RUNNING | Worker 取出，执行中 |
+| SUCCEEDED | 成功完成（部分 case 失败也算 SUCCEEDED） |
+| FAILED | FATAL 错误导致整体失败 |
+| CANCELLED | 用户取消或中断 |
+
+**参考系统：**
+
+| 系统 | 状态设计 |
+|------|---------|
+| **Prefect** | pending → running → completed/failed/cancelled |
+| **Temporal** | scheduled → running → completed/failed/terminated |
+| **Celery** | pending → started → success/failure/revoked |
+
+**MVP 实现思路：**
+
+| 阶段 | 队列实现 | 说明 |
+|------|---------|------|
+| **MVP** | SQLite 表 + asyncio.Queue | 单进程，表即队列 |
+| **后续** | Redis Queue / Celery | 分布式，多 Worker |
+
+**SQLite 表作为队列：**
+```sql
+-- 取待执行任务
+SELECT * FROM runs WHERE status = 'pending' ORDER BY created_at LIMIT 1;
+
+-- 开始执行
+UPDATE runs SET status = 'running', started_at = CURRENT_TIMESTAMP WHERE run_id = ?;
+
+-- 完成
+UPDATE runs SET status = 'succeeded', finished_at = CURRENT_TIMESTAMP WHERE run_id = ?;
+```
+
 **表结构示意：**
 ```sql
 -- runs 表
@@ -229,7 +272,7 @@ run_id TEXT PRIMARY KEY,
 dataset_path TEXT,
 provider_name TEXT,
 model_config JSON,
-status TEXT,  -- 'running', 'completed', 'interrupted'
+status TEXT,  -- 'pending', 'running', 'succeeded', 'failed', 'cancelled'
 created_at TIMESTAMP,
 updated_at TIMESTAMP
 
