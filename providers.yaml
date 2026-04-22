@@ -1,0 +1,10 @@
+mock-default:
+  type: mock
+  mode: mapping
+  mapping_file: ./data/mock_responses.json
+
+example-openai-compatible:
+  type: openai_compatible
+  base_url: ${MODEL_BASE_URL}
+  model: example-model
+  api_key_env: MODEL_API_KEY

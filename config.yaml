@@ -1,0 +1,8 @@
+timeout_ms: 30000
+max_retries: 3
+concurrency: 4
+output_dir: "./outputs"
+evaluators_package: "mini_llm_eval.evaluators"
+defaults:
+  evaluators:
+    - contains
