@@ -1,8 +1,10 @@
 # Mini LLM Eval v1 开发计划
 
+> 说明：本文件是开发拆解计划，v1 规格定义以 `docs/7_v1_implementation_spec.md` 为准。
+
 > 本文档是 v1 版本的实施计划，聚焦核心功能，报表层后续迭代。
 >
-> 设计参考：`5_critical_design.md`, `3.2_design_decisions.md`, `raw_requirement.txt`
+> 设计参考：`7_v1_implementation_spec.md`, `5_critical_design.md`, `3.2_design_decisions.md`, `raw_requirement.txt`
 
 ---
 
@@ -81,7 +83,7 @@ mini_llm_eval/                  # 项目根目录 (git repo)
 ├── demo/                       # 示例脚本
 │   └── .gitkeep
 ├── docs/                       # 文档
-│   └── design.md
+│   └── 7_v1_implementation_spec.md
 ├── config.yaml                 # 项目级配置（示例）
 ├── providers.yaml              # Provider 配置（示例）
 ├── pyproject.toml              # 打包配置
@@ -146,7 +148,7 @@ mini-llm-eval run --dataset data/cases.jsonl --provider qwen
 # 配置文件查找顺序：--config > ./config.yaml > ~/.mini_llm_eval/config.yaml
 # 参考：5_critical_design.md §4.4
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 import yaml
 import os
@@ -270,10 +272,10 @@ class EvalCase(BaseModel):
     case_id: str
     query: str
     expected_answer: str
-    tags: List[str] = []
+    tags: List[str] = Field(default_factory=list)
     difficulty: str = "medium"  # easy | medium | hard
-    eval_types: List[str] = ["contains"]  # 支持多个，独立执行
-    metadata: dict = {}
+    eval_types: List[str] = Field(default_factory=lambda: ["contains"])  # 支持多个，独立执行
+    metadata: dict = Field(default_factory=dict)
 
 class CaseResult(BaseModel):
     """单条 case 结果 - 参考 5_critical_design.md §4.1"""
@@ -284,7 +286,7 @@ class CaseResult(BaseModel):
     output_path: Optional[str] = None  # 大文本存文件，DB 存路径
 
     # 每个 evaluator 独立结果，不合并
-    eval_results: Dict[str, EvalResult] = {}
+    eval_results: Dict[str, EvalResult] = Field(default_factory=dict)
 
     # Provider 相关
     latency_ms: float
@@ -292,7 +294,7 @@ class CaseResult(BaseModel):
     error_message: Optional[str] = None
     retries: int = 0
 
-    created_at: datetime = None
+    created_at: Optional[datetime] = None
 
 # === Run 相关 ===
 
@@ -300,7 +302,7 @@ class RunStatus(str, Enum):
     """Run 状态机 - 参考 raw_requirement 方向 A + 5_critical_design.md §4.3"""
     PENDING = "pending"       # 任务已创建，未开始
     RUNNING = "running"       # 执行中
-    SUCCEEDED = "succeeded"   # 成功完成（部分 case 失败也算）
+    SUCCEEDED = "succeeded"   # 执行完成并成功产出结果（部分 case 失败也算）
     FAILED = "failed"         # FATAL 错误导致整体失败
     CANCELLED = "cancelled"   # 用户取消/中断
 
@@ -314,7 +316,7 @@ class RunConfig(BaseModel):
     run_id: str
     dataset_path: str
     provider_name: str
-    model_config: dict = {}
+    model_config: dict = Field(default_factory=dict)
     concurrency: int = 4
     timeout_ms: int = 30000
     max_retries: int = 3
@@ -339,6 +341,13 @@ class RunConfig(BaseModel):
 
 ### 任务
 
+### 设计约束
+
+- Provider 面向远程模型服务，默认按异步 HTTP client 设计
+- v1 标准实现使用 `httpx.AsyncClient`
+- 不在异步调用链中使用 `requests`
+- 后续如有特殊需要再评估 `aiohttp`
+
 ### 3.1 Provider 基类 (`src/mini_llm_eval/providers/base.py`)
 
 ```python
@@ -350,7 +359,7 @@ from mini_llm_eval.models.schemas import ProviderResponse
 class BaseProvider(ABC):
     @abstractmethod
     async def generate(self, query: str, **kwargs) -> ProviderResponse:
-        """异步生成响应"""
+        """异步生成响应，适用于远程 HTTP 模型服务调用"""
         pass
 
     @property
@@ -415,6 +424,7 @@ class OpenAICompatibleProvider(BaseProvider):
     - base_url 可配置
     - api_key 从环境变量读取
     - 支持重试（指数退避）
+    - 使用 httpx.AsyncClient 发起异步 HTTP 请求
     """
     pass
 ```
@@ -439,6 +449,7 @@ async def with_retry(func, max_retries: int = 3):
 ### 验收标准
 - [ ] MockProvider 能返回映射表中的响应
 - [ ] MockProvider fallback 能随机返回
+- [ ] OpenAICompatibleProvider 使用 `httpx.AsyncClient`
 - [ ] OpenAICompatibleProvider 能调用真实 API（用 Qwen 测试）
 - [ ] 重试逻辑正确（可重试错误重试，不可重试错误直接返回）
 
@@ -668,7 +679,7 @@ class FileStorage:
     def save_output(self, run_id: str, case_id: str, content: str) -> str:
         """
         保存大文本到文件，返回文件路径
-        结构：outputs/{run_id}/{case_id}_output.json
+        结构：outputs/{run_id}/case_results.jsonl 和 outputs/{run_id}/meta.json
         """
         pass
 
@@ -683,6 +694,7 @@ class FileStorage:
 # 参考：5_critical_design.md §4.2 结果文件写入失败处理
 
 import tempfile
+from pathlib import Path
 
 def save_with_fallback(path: str, content: str) -> str:
     """
@@ -693,10 +705,18 @@ def save_with_fallback(path: str, content: str) -> str:
         # 尝试原路径
         pass
     except Exception as e:
-        # 降级到 /tmp
-        fallback_path = tempfile.mktemp(suffix=".json")
+        # 安全降级到临时目录
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".json",
+            delete=False,
+            dir="/tmp",
+            encoding="utf-8",
+        ) as tmp:
+            tmp.write(content)
+            fallback_path = Path(tmp.name)
         print(f"⚠️ 写入失败，已降级到: {fallback_path}")
-        return fallback_path
+        return str(fallback_path)
 ```
 
 ### 验收标准
@@ -740,16 +760,17 @@ def load_dataset(path: str) -> list[EvalCase]:
 ### 6.2 执行引擎 (`src/mini_llm_eval/services/executor.py`)
 
 ```python
-# 参考：2_design_v0.1.md §6.2 执行引擎设计
-# 参考：5_critical_design.md §4.1 多 Evaluator 执行
+# 参考：7_v1_implementation_spec.md §8 执行调度
+# 参考：7_v1_implementation_spec.md §15 并发模型
 
 import asyncio
 from mini_llm_eval.models.schemas import EvalCase, CaseResult
 
 class Executor:
     def __init__(self, concurrency: int = 4, timeout_ms: int = 30000):
-        self.semaphore = asyncio.Semaphore(concurrency)
+        self.provider_semaphore = asyncio.Semaphore(concurrency)
         self.timeout_ms = timeout_ms
+        self.result_queue = asyncio.Queue()
 
     async def execute_case(
         self,
@@ -760,12 +781,14 @@ class Executor:
         """
         执行单个 case
         1. 调用 provider
-        2. 对每个 evaluator 独立执行（不合并）
-        3. 返回结果
+        2. 在当前 case task 内执行规则 evaluator
+        3. 生成 CaseResult
+        4. 推送到 result_queue
         """
-        async with self.semaphore:
+        async with self.provider_semaphore:
             # provider 调用（带超时和重试）
-            # evaluator 执行（每个独立，出错记录 trace）
+            # evaluator 在当前 task 内执行（每个独立，出错记录 trace）
+            # 将结果投递给 writer queue
             pass
 
     async def execute_batch(
@@ -776,7 +799,15 @@ class Executor:
         on_result: callable = None  # 实时回调，用于写入数据库
     ) -> list[CaseResult]:
         """
-        批量执行，支持并发
+        批量执行，支持 case 级并发
+        """
+        pass
+
+    async def writer_loop(self, on_result: callable):
+        """
+        单独 writer 协程，串行消费 result_queue
+        - 写入数据库
+        - 追加写入 case_results.jsonl
         """
         pass
 ```
@@ -814,10 +845,21 @@ class RunService:
 
 ### 验收标准
 - [ ] 能正确加载 JSONL 数据集
-- [ ] 并发执行正常（Semaphore 限制生效）
+- [ ] case 级并发执行正常（Provider Semaphore 限制生效）
 - [ ] 单条 case 失败不影响其他 case
 - [ ] evaluator 出错时记录 trace
+- [ ] writer queue 串行写入正常
 - [ ] 断点恢复正确跳过已完成的 case
+
+### 后续版本备注
+
+后续 v2/v3 可演进为：
+
+- provider queue + provider worker pool
+- evaluator queue + evaluator worker pool
+- 更明确的 staged pipeline
+
+但这些不进入 v1 实现。
 
 ---
 
