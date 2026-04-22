@@ -7,4 +7,15 @@
 - Added root project files: `pyproject.toml`, `README.md`, `config.yaml`, and `providers.yaml`.
 - Prepared empty `data/`, `demo/`, `outputs/`, and `tests/` directories for implementation work.
 - Created a new Miniconda environment: `mini-llm-eval` with Python 3.11.
-- Next implementation target: `core` and `models` modules.
+- Implemented foundational `core` and `models` modules:
+  - config loading with YAML + `${ENV_VAR}` expansion
+  - exception hierarchy
+  - shared Pydantic schemas and status enums
+- Added foundational tests for config loading and schema behavior.
+- Implemented evaluator base class, registry, auto-discovery, and 5 built-in rule evaluators.
+- Added evaluator tests for registration and rule behavior.
+- Implemented dataset loading with JSONL/JSON support and `eval_type -> eval_types` normalization.
+- Added a sample dataset at `data/eval_cases.jsonl` with 20 cases across multiple scenarios.
+- Added dataset tests for success and failure paths.
+- Verified editable install and passed `23` tests in the Conda environment.
+- Next implementation target: Provider layer, then storage and execution flow.
