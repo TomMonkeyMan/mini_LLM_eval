@@ -23,4 +23,12 @@
   - removed evaluator module `reload()` from normal discovery flow
   - reset evaluator module cache only in test-oriented `clear_registry()`
   - documented the `RunConfig.model_config` alias decision inline
-- Next implementation target: Provider layer, then storage and execution flow.
+- Implemented Provider layer:
+  - `BaseProvider`
+  - retry helper
+  - factory
+  - `MockProvider`
+  - `OpenAICompatibleProvider` using `httpx.AsyncClient`
+- Added provider tests covering mock behavior, factory creation, retry logic, and OpenAI-compatible parsing.
+- Current verified test count: `30` passing in the Conda environment.
+- Next implementation target: storage layer, then execution flow.

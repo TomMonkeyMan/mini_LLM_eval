@@ -1,0 +1,158 @@
+"""Tests for provider implementations."""
+
+from __future__ import annotations
+
+import json
+import random
+
+import httpx
+import pytest
+
+from mini_llm_eval.core.config import ProviderConfig
+from mini_llm_eval.core.exceptions import ProviderInitError
+from mini_llm_eval.models.schemas import ProviderStatus
+from mini_llm_eval.providers.factory import create_provider
+from mini_llm_eval.providers.mock import MockProvider
+from mini_llm_eval.providers.openai_compatible import OpenAICompatibleProvider
+from mini_llm_eval.providers.retry import with_retry
+
+
+@pytest.mark.asyncio
+async def test_mock_provider_returns_mapping_response(tmp_path) -> None:
+    mapping_path = tmp_path / "mock.json"
+    mapping_path.write_text(json.dumps({"hello": "world"}), encoding="utf-8")
+    provider = MockProvider(
+        "mock-default",
+        ProviderConfig(type="mock", mapping_file=str(mapping_path)),
+        rng=random.Random(0),
+    )
+
+    response = await provider.generate("hello")
+
+    assert response.status is ProviderStatus.SUCCESS
+    assert response.output == "world"
+
+
+@pytest.mark.asyncio
+async def test_mock_provider_fallback_can_use_expected_answer(tmp_path) -> None:
+    mapping_path = tmp_path / "mock.json"
+    mapping_path.write_text("{}", encoding="utf-8")
+    provider = MockProvider(
+        "mock-default",
+        ProviderConfig.from_mapping(
+            {
+                "type": "mock",
+                "mapping_file": str(mapping_path),
+                "fallback": {
+                    "enabled": True,
+                    "success_rate": 1.0,
+                    "default_response": "fallback",
+                },
+            }
+        ),
+        rng=random.Random(0),
+    )
+
+    response = await provider.generate("missing", expected_answer="expected-value")
+
+    assert response.output == "expected-value"
+    assert response.status is ProviderStatus.SUCCESS
+
+
+def test_factory_creates_known_provider_types() -> None:
+    provider = create_provider("mock-default", ProviderConfig(type="mock"))
+
+    assert provider.name == "mock-default"
+
+
+@pytest.mark.asyncio
+async def test_openai_provider_parses_success_response(monkeypatch) -> None:
+    monkeypatch.setenv("TEST_API_KEY", "secret")
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["Authorization"] == "Bearer secret"
+        return httpx.Response(
+            200,
+            json={
+                "model": "demo-model",
+                "choices": [{"message": {"content": "hello back"}}],
+                "usage": {
+                    "prompt_tokens": 1,
+                    "completion_tokens": 2,
+                    "total_tokens": 3,
+                },
+            },
+            headers={"x-request-id": "req-123"},
+        )
+
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url="https://example.test",
+    )
+    provider = OpenAICompatibleProvider(
+        "remote",
+        ProviderConfig(
+            type="openai_compatible",
+            base_url="https://example.test",
+            model="demo-model",
+            api_key_env="TEST_API_KEY",
+        ),
+        client=client,
+    )
+
+    response = await provider.generate("hello")
+    await provider.close()
+
+    assert response.status is ProviderStatus.SUCCESS
+    assert response.output == "hello back"
+    assert response.token_usage.total_tokens == 3
+    assert response.request_id == "req-123"
+
+
+@pytest.mark.asyncio
+async def test_openai_provider_returns_error_response_for_4xx() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": {"message": "bad request"}})
+
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url="https://example.test",
+    )
+    provider = OpenAICompatibleProvider(
+        "remote",
+        ProviderConfig(
+            type="openai_compatible",
+            base_url="https://example.test",
+            model="demo-model",
+        ),
+        client=client,
+    )
+
+    response = await provider.generate("hello")
+    await provider.close()
+
+    assert response.status is ProviderStatus.ERROR
+    assert response.error == "bad_request"
+
+
+def test_openai_provider_requires_base_url_and_model() -> None:
+    with pytest.raises(ProviderInitError):
+        OpenAICompatibleProvider("remote", ProviderConfig(type="openai_compatible"))
+
+
+@pytest.mark.asyncio
+async def test_with_retry_retries_retryable_provider_errors() -> None:
+    attempts = {"count": 0}
+
+    async def flaky() -> str:
+        attempts["count"] += 1
+        if attempts["count"] < 3:
+            from mini_llm_eval.core.exceptions import ProviderError
+
+            raise ProviderError("server_error")
+        return "ok"
+
+    result = await with_retry(flaky, max_retries=3, retry_delays=(0, 0, 0))
+
+    assert result == "ok"
+    assert attempts["count"] == 3
