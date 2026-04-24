@@ -30,5 +30,30 @@
   - `MockProvider`
   - `OpenAICompatibleProvider` using `httpx.AsyncClient`
 - Added provider tests covering mock behavior, factory creation, retry logic, and OpenAI-compatible parsing.
-- Current verified test count: `30` passing in the Conda environment.
-- Next implementation target: storage layer, then execution flow.
+- Implemented storage layer:
+  - SQLite database schema for `runs`, `case_results`, and `state_logs`
+  - run lifecycle operations and state logging
+  - case result persistence and completed-case lookup
+  - file artifact writing for `case_results.jsonl` and `meta.json`
+  - safe fallback writing when the primary output directory is unavailable
+- Added storage tests for database lifecycle and artifact output.
+- Current verified test count: `34` passing in the Conda environment.
+- Next implementation target: executor and run service orchestration.
+
+## 2026-04-24
+
+- Incorporated Claude review #2 into the working notes.
+- Confirmed the Provider-layer review is directionally correct and non-blocking.
+- Chose not to interrupt the storage/execution roadmap for low-priority Provider refinements.
+- Deferred follow-ups from review #2:
+  - add explicit 5xx retry coverage for `OpenAICompatibleProvider`
+  - consider replacing `ProviderError(args[0])` error-code signaling with a clearer typed field
+  - document `ProviderConfig.extra` precedence more explicitly if configuration complexity grows
+- Current implementation status:
+  - foundations complete
+  - evaluators complete
+  - dataset loading complete
+  - provider layer complete
+  - storage layer complete
+- Current verified test count remains `34` passing in the Conda environment.
+- Next implementation target remains: executor and run service orchestration.
