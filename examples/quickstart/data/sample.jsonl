@@ -1,0 +1,3 @@
+{"case_id": "qa-001", "query": "什么是机器学习？", "expected_answer": "机器学习", "eval_types": ["contains"], "tags": ["knowledge"]}
+{"case_id": "qa-002", "query": "1+1等于多少？", "expected_answer": "2", "eval_types": ["contains"], "tags": ["math"]}
+{"case_id": "qa-003", "query": "Python 的创始人是谁？", "expected_answer": "Guido", "eval_types": ["contains"], "tags": ["knowledge"]}

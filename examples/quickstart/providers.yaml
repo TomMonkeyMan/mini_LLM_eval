@@ -1,0 +1,17 @@
+# Mock Provider - 用于测试，无需 API
+mock-echo:
+  type: mock
+  mode: echo
+
+# Plugin Provider - 自定义模型调用
+my-plugin:
+  type: plugin
+  plugin: echo
+  plugins_dir: ./plugins
+
+# OpenAI Compatible - 真实模型（取消注释使用）
+# qwen:
+#   type: openai_compatible
+#   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+#   model: qwen-turbo
+#   api_key_env: QWEN_API_KEY
