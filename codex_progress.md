@@ -55,5 +55,21 @@
   - dataset loading complete
   - provider layer complete
   - storage layer complete
-- Current verified test count remains `34` passing in the Conda environment.
-- Next implementation target remains: executor and run service orchestration.
+- executor complete
+- run service complete
+- Added orchestration tests covering:
+  - executor writer-queue flow
+  - end-to-end `start_run`
+  - `resume_run` skipping completed cases
+- CLI complete
+- Added CLI commands:
+  - `run`
+  - `resume`
+  - `status`
+- Added CLI tests covering:
+  - end-to-end `run` + `status`
+  - `resume` on an already completed run
+- Fixed provider cleanup on RunService exception paths and added a regression test.
+- Current verified test count is now `40` passing in the Conda environment.
+- MVP status: core execution path is runnable end-to-end from the CLI.
+- Next implementation target: polish, docs, and optional follow-up fixes from review notes.
