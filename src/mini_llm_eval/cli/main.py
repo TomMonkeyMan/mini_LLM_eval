@@ -12,12 +12,14 @@ from rich.console import Console
 from rich.table import Table
 
 from mini_llm_eval.core.config import (
+    Config,
     load_config,
     load_providers,
     reset_runtime_config,
     set_runtime_config,
 )
 from mini_llm_eval.core.exceptions import EvalRunnerException
+from mini_llm_eval.core.types import RunRecord
 from mini_llm_eval.db.database import Database
 from mini_llm_eval.db.file_storage import FileStorage
 from mini_llm_eval.models.schemas import RunConfig
@@ -31,7 +33,7 @@ def _build_runtime(
     config_path: str | None,
     providers_path: str | None,
     db_path: str | None,
-):
+) -> tuple[Config, Database, RunService]:
     config = load_config(config_path)
     providers = load_providers(providers_path)
     set_runtime_config(config=config, providers=providers)
@@ -43,7 +45,30 @@ def _build_runtime(
     return config, db, service
 
 
-def _print_run_summary(run_record: dict) -> None:
+async def _run_and_load_record(service: RunService, db: Database, run_config: RunConfig) -> RunRecord:
+    await service.start_run(run_config)
+    run_record = await db.get_run(run_config.run_id)
+    if run_record is None:
+        raise EvalRunnerException(f"Run completed but could not be loaded: {run_config.run_id}")
+    return run_record
+
+
+async def _resume_and_load_record(service: RunService, db: Database, run_id: str) -> RunRecord:
+    resumed_run_id = await service.resume_run(run_id)
+    run_record = await db.get_run(resumed_run_id)
+    if run_record is None:
+        raise EvalRunnerException(f"Run resumed but could not be loaded: {resumed_run_id}")
+    return run_record
+
+
+async def _load_status_record(db: Database, run_id: str) -> RunRecord:
+    run_record = await db.get_run(run_id)
+    if run_record is None:
+        raise EvalRunnerException(f"Run not found: {run_id}")
+    return run_record
+
+
+def _print_run_summary(run_record: RunRecord) -> None:
     summary = json.loads(run_record["summary_json"]) if run_record.get("summary_json") else None
 
     table = Table(title=f"Run {run_record['run_id']}")
@@ -89,10 +114,7 @@ def run(
             timeout_ms=timeout or cfg.timeout_ms,
             max_retries=cfg.max_retries,
         )
-        asyncio.run(service.start_run(run_config))
-        run_record = asyncio.run(db.get_run(resolved_run_id))
-        if run_record is None:
-            raise EvalRunnerException(f"Run completed but could not be loaded: {resolved_run_id}")
+        run_record = asyncio.run(_run_and_load_record(service, db, run_config))
         _print_run_summary(run_record)
     except EvalRunnerException as exc:
         console.print(f"[red]Error:[/red] {exc}")
@@ -112,10 +134,7 @@ def resume(
 
     try:
         _, db, service = _build_runtime(config, providers, db_path)
-        resumed_run_id = asyncio.run(service.resume_run(run_id))
-        run_record = asyncio.run(db.get_run(resumed_run_id))
-        if run_record is None:
-            raise EvalRunnerException(f"Run resumed but could not be loaded: {resumed_run_id}")
+        run_record = asyncio.run(_resume_and_load_record(service, db, run_id))
         _print_run_summary(run_record)
     except EvalRunnerException as exc:
         console.print(f"[red]Error:[/red] {exc}")
@@ -136,9 +155,7 @@ def status(
         cfg = load_config(config)
         resolved_db_path = db_path or str(Path(cfg.output_dir) / "eval.db")
         db = Database(resolved_db_path)
-        run_record = asyncio.run(db.get_run(run_id))
-        if run_record is None:
-            raise EvalRunnerException(f"Run not found: {run_id}")
+        run_record = asyncio.run(_load_status_record(db, run_id))
         _print_run_summary(run_record)
     except EvalRunnerException as exc:
         console.print(f"[red]Error:[/red] {exc}")

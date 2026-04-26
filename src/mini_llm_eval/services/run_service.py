@@ -9,6 +9,7 @@ from typing import Any
 
 from mini_llm_eval.core.config import Config, ProviderConfig, get_config, get_providers
 from mini_llm_eval.core.exceptions import DatasetLoadError, PersistenceError, ProviderInitError
+from mini_llm_eval.core.types import RunMeta
 from mini_llm_eval.db.database import Database
 from mini_llm_eval.db.file_storage import FileStorage
 from mini_llm_eval.evaluators import registry as evaluator_registry
@@ -160,7 +161,7 @@ class RunService:
         persisted_result = result.model_copy(update={"output_path": artifact_path})
         await self.db.save_case_result(persisted_result)
 
-    async def _build_meta(self, run_id: str) -> dict[str, Any]:
+    async def _build_meta(self, run_id: str) -> RunMeta:
         run_record = await self.db.get_run(run_id)
         state_logs = await self.db.get_state_logs(run_id)
         case_results = await self.db.get_case_results(run_id)

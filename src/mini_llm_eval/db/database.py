@@ -9,6 +9,7 @@ from typing import Any
 import aiosqlite
 
 from mini_llm_eval.core.exceptions import InvalidTransitionError, PersistenceError
+from mini_llm_eval.core.types import CaseResultRecord, RunRecord, StateLogRecord
 from mini_llm_eval.models.schemas import CaseResult, RunConfig, RunStatus
 
 SCHEMA = """
@@ -281,7 +282,7 @@ class Database:
 
         return {row[0] for row in rows}
 
-    async def get_run(self, run_id: str) -> dict[str, Any] | None:
+    async def get_run(self, run_id: str) -> RunRecord | None:
         """Return a run record as a plain dict."""
 
         try:
@@ -292,9 +293,9 @@ class Database:
         except aiosqlite.Error as exc:
             raise PersistenceError(f"Failed to query run {run_id}: {exc}") from exc
 
-        return dict(row) if row else None
+        return RunRecord(**dict(row)) if row else None
 
-    async def get_case_results(self, run_id: str) -> list[dict[str, Any]]:
+    async def get_case_results(self, run_id: str) -> list[CaseResultRecord]:
         """Return stored case result records for a run."""
 
         try:
@@ -308,9 +309,9 @@ class Database:
         except aiosqlite.Error as exc:
             raise PersistenceError(f"Failed to query case results for {run_id}: {exc}") from exc
 
-        return [dict(row) for row in rows]
+        return [CaseResultRecord(**dict(row)) for row in rows]
 
-    async def get_state_logs(self, run_id: str) -> list[dict[str, Any]]:
+    async def get_state_logs(self, run_id: str) -> list[StateLogRecord]:
         """Return state transition logs for a run."""
 
         try:
@@ -324,7 +325,7 @@ class Database:
         except aiosqlite.Error as exc:
             raise PersistenceError(f"Failed to query state logs for {run_id}: {exc}") from exc
 
-        return [dict(row) for row in rows]
+        return [StateLogRecord(**dict(row)) for row in rows]
 
     async def _get_current_status(self, db: aiosqlite.Connection, run_id: str) -> str:
         db.row_factory = aiosqlite.Row

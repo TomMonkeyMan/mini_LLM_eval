@@ -80,3 +80,17 @@
 - Added plugin-provider tests for successful loading and invalid plugin rejection.
 - Current verified test count remains `40` passing in the Conda environment.
 - Next implementation target: polish, docs, and optional follow-up fixes from review notes.
+
+## 2026-04-26
+
+- Reviewed `reviews/review_06_code_standards.md` and applied the highest-value fixes instead of broad style churn.
+- Added shared TypedDict record definitions in `src/mini_llm_eval/core/types.py` for:
+  - persisted run rows
+  - persisted case-result rows
+  - state-log rows
+  - run meta artifact shape
+- Updated `Database` typed return signatures to use structured record types instead of `dict[str, Any]`.
+- Updated `RunService._build_meta()` to return the shared `RunMeta` structure.
+- Consolidated CLI async execution so each command now uses a single `asyncio.run(...)` path instead of multiple event-loop entries.
+- Re-ran the full test suite in the Conda environment.
+- Current verified test count: `42` passing.
