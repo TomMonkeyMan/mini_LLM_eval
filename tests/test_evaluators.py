@@ -23,8 +23,11 @@ def test_auto_discover_registers_builtin_evaluators() -> None:
 
     assert list_all() == [
         "contains",
+        "contains_all",
         "exact_match",
         "json_field",
+        "length_range",
+        "not_contains",
         "numeric_tolerance",
         "regex",
     ]
@@ -67,6 +70,46 @@ def test_regex_evaluator_matches_patterns() -> None:
     result = evaluator.evaluate("Voltage: 384V", r"\d+V")
 
     assert result.passed is True
+
+
+def test_not_contains_evaluator_rejects_forbidden_keywords() -> None:
+    clear_registry()
+    module = importlib.import_module("mini_llm_eval.evaluators.not_contains")
+    evaluator = module.NotContainsEvaluator()
+
+    result = evaluator.evaluate("The answer leaked a token value", "password|token|secret")
+
+    assert result.passed is False
+    assert result.details["matched"] == ["token"]
+
+
+def test_contains_all_evaluator_requires_all_keywords() -> None:
+    clear_registry()
+    module = importlib.import_module("mini_llm_eval.evaluators.contains_all")
+    evaluator = module.ContainsAllEvaluator()
+
+    result = evaluator.evaluate(
+        "机器学习依赖训练数据和模型设计",
+        "机器学习|训练数据|模型",
+    )
+
+    assert result.passed is True
+    assert result.details["missing"] == []
+
+
+def test_length_range_evaluator_uses_case_metadata_bounds() -> None:
+    clear_registry()
+    module = importlib.import_module("mini_llm_eval.evaluators.length_range")
+    evaluator = module.LengthRangeEvaluator()
+
+    result = evaluator.evaluate(
+        "sufficiently detailed answer",
+        "",
+        case_metadata={"min_length": 10, "max_length": 50},
+    )
+
+    assert result.passed is True
+    assert result.details["length"] == len("sufficiently detailed answer")
 
 
 def test_json_field_evaluator_uses_field_config() -> None:

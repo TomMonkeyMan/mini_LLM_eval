@@ -25,10 +25,13 @@
   - `plugin`
 - Evaluator
   - `exact_match`
-  - `contains`
-  - `regex`
-  - `json_field`
-  - `numeric_tolerance`
+- `contains`
+- `contains_all`
+- `regex`
+- `json_field`
+- `length_range`
+- `not_contains`
+- `numeric_tolerance`
 - 执行模型
   - Provider 并发执行
   - Evaluator 内联执行
