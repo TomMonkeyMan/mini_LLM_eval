@@ -47,6 +47,8 @@ class ProviderConfig(BaseModel):
     """Per-provider configuration."""
 
     type: str
+    plugin: str | None = None
+    plugins_dir: str | None = None
     base_url: str | None = None
     model: str | None = None
     api_key_env: str | None = None

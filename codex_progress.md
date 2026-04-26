@@ -72,4 +72,11 @@
 - Fixed provider cleanup on RunService exception paths and added a regression test.
 - Current verified test count is now `40` passing in the Conda environment.
 - MVP status: core execution path is runnable end-to-end from the CLI.
+- Added a plugin-based Provider extension point:
+  - new provider type `plugin`
+  - dynamic loading from `plugins/*.py`
+  - user plugins only need to implement `async generate(query, config, **kwargs)`
+  - configuration-driven selection through `providers.yaml`
+- Added plugin-provider tests for successful loading and invalid plugin rejection.
+- Current verified test count remains `40` passing in the Conda environment.
 - Next implementation target: polish, docs, and optional follow-up fixes from review notes.

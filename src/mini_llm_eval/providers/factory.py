@@ -14,6 +14,10 @@ def create_provider(name: str, config: ProviderConfig) -> BaseProvider:
         from mini_llm_eval.providers.mock import MockProvider
 
         return MockProvider(name, config)
+    if config.type == "plugin":
+        from mini_llm_eval.providers.plugin import PluginProvider
+
+        return PluginProvider(name, config)
     if config.type == "openai_compatible":
         from mini_llm_eval.providers.openai_compatible import OpenAICompatibleProvider
 

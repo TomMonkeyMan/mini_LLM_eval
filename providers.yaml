@@ -8,3 +8,9 @@ example-openai-compatible:
   base_url: ${MODEL_BASE_URL}
   model: example-model
   api_key_env: MODEL_API_KEY
+
+example-plugin-provider:
+  type: plugin
+  plugin: simple_qa
+  plugins_dir: ./plugins
+  endpoint: http://localhost:8000/predict

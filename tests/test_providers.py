@@ -14,6 +14,7 @@ from mini_llm_eval.models.schemas import ProviderStatus
 from mini_llm_eval.providers.factory import create_provider
 from mini_llm_eval.providers.mock import MockProvider
 from mini_llm_eval.providers.openai_compatible import OpenAICompatibleProvider
+from mini_llm_eval.providers.plugin import PluginProvider
 from mini_llm_eval.providers.retry import with_retry
 
 
@@ -63,6 +64,70 @@ def test_factory_creates_known_provider_types() -> None:
     provider = create_provider("mock-default", ProviderConfig(type="mock"))
 
     assert provider.name == "mock-default"
+
+
+@pytest.mark.asyncio
+async def test_plugin_provider_loads_async_generate_function(tmp_path) -> None:
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    plugin_path = plugins_dir / "demo_plugin.py"
+    plugin_path.write_text(
+        "\n".join(
+            [
+                "async def generate(query, config, **kwargs):",
+                "    return {",
+                '        "output": f"{config[\'prefix\']}:{query}",',
+                '        "request_id": "plugin-req",',
+                "    }",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    provider = PluginProvider(
+        "custom-demo",
+        ProviderConfig.from_mapping(
+            {
+                "type": "plugin",
+                "plugin": "demo_plugin",
+                "plugins_dir": str(plugins_dir),
+                "prefix": "ok",
+            }
+        ),
+    )
+
+    response = await provider.generate("hello")
+
+    assert response.status is ProviderStatus.SUCCESS
+    assert response.output == "ok:hello"
+    assert response.request_id == "plugin-req"
+
+
+def test_plugin_provider_rejects_non_async_generate(tmp_path) -> None:
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    plugin_path = plugins_dir / "bad_plugin.py"
+    plugin_path.write_text(
+        "\n".join(
+            [
+                "def generate(query, config, **kwargs):",
+                '    return {"output": "bad"}',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ProviderInitError):
+        PluginProvider(
+            "custom-demo",
+            ProviderConfig.from_mapping(
+                {
+                    "type": "plugin",
+                    "plugin": "bad_plugin",
+                    "plugins_dir": str(plugins_dir),
+                }
+            ),
+        )
 
 
 @pytest.mark.asyncio
