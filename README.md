@@ -97,6 +97,7 @@ mini-llm-eval --help
 timeout_ms: 30000
 max_retries: 3
 concurrency: 4
+log_level: "INFO"
 output_dir: "./outputs"
 evaluators_package: "mini_llm_eval.evaluators"
 defaults:
@@ -109,6 +110,7 @@ defaults:
 - `timeout_ms`: Provider 调用超时
 - `max_retries`: Provider 重试次数
 - `concurrency`: 默认 Provider 并发数
+- `log_level`: 运行时日志级别，支持标准 Python logging level
 - `output_dir`: 输出目录
 - `evaluators_package`: Evaluator 自动发现包路径
 
@@ -217,6 +219,17 @@ mini-llm-eval run --help
 ## 输出结果
 
 默认输出到 `output_dir`。
+
+## 日志
+
+CLI 运行时会输出 JSON line 日志到标准错误，适合后续接到文件、采集器或日志平台。
+
+当前已覆盖的关键事件包括：
+
+- CLI 命令开始 / 完成 / 失败
+- run 开始 / 完成 / 失败 / resume
+- provider 重试、超时、错误
+- artifact fallback 写入告警
 
 一次 run 完成后会生成：
 

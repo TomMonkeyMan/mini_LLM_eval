@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 
 from mini_llm_eval.core.exceptions import EvaluatorError
+from mini_llm_eval.core.logging import get_logger
 from mini_llm_eval.models.schemas import (
     CaseResult,
     CaseStatus,
@@ -18,12 +19,14 @@ from mini_llm_eval.providers.base import BaseProvider
 from mini_llm_eval.evaluators.base import BaseEvaluator
 
 ResultWriter = Callable[[CaseResult], Awaitable[None]]
+logger = get_logger(__name__)
 
 
 class Executor:
     """Execute a batch of cases with bounded Provider concurrency."""
 
     def __init__(self, concurrency: int = 4, timeout_ms: int = 30000):
+        self.concurrency = concurrency
         self.provider_semaphore = asyncio.Semaphore(concurrency)
         self.timeout_ms = timeout_ms
         self.result_queue: asyncio.Queue[CaseResult | object] = asyncio.Queue()
@@ -45,6 +48,16 @@ class Executor:
                     timeout=self.timeout_ms / 1000,
                 )
         except asyncio.TimeoutError:
+            logger.warning(
+                "Provider request timed out during case execution",
+                extra={
+                    "event": "case_provider_timeout",
+                    "run_id": run_id,
+                    "case_id": case.case_id,
+                    "provider_name": provider.name,
+                    "timeout_ms": self.timeout_ms,
+                },
+            )
             return self._build_error_result(
                 run_id=run_id,
                 case=case,
@@ -52,6 +65,16 @@ class Executor:
                 error_message="Provider request timed out",
             )
         except Exception as exc:
+            logger.warning(
+                "Provider request failed during case execution",
+                extra={
+                    "event": "case_provider_error",
+                    "run_id": run_id,
+                    "case_id": case.case_id,
+                    "provider_name": provider.name,
+                    "error": str(exc),
+                },
+            )
             return self._build_error_result(
                 run_id=run_id,
                 case=case,
@@ -70,6 +93,16 @@ class Executor:
                 )
             except Exception as exc:
                 had_evaluator_error = True
+                logger.warning(
+                    "Evaluator raised an exception",
+                    extra={
+                        "event": "case_evaluator_error",
+                        "run_id": run_id,
+                        "case_id": case.case_id,
+                        "evaluator_name": evaluator.name,
+                        "error": str(exc),
+                    },
+                )
                 eval_results[evaluator.name] = EvalResult(
                     passed=False,
                     reason=f"Evaluator raised an exception: {exc}",
@@ -109,6 +142,16 @@ class Executor:
     ) -> list[CaseResult]:
         """Execute cases concurrently and write results through a writer queue."""
 
+        logger.info(
+            "Batch execution started",
+            extra={
+                "event": "batch_execution_started",
+                "run_id": run_id,
+                "case_count": len(cases),
+                "provider_name": provider.name,
+                "concurrency": self.concurrency,
+            },
+        )
         writer_task = asyncio.create_task(self.writer_loop(on_result))
         results: list[CaseResult] = []
 
@@ -133,6 +176,15 @@ class Executor:
             await self.result_queue.put(self._sentinel)
             await writer_task
 
+        logger.info(
+            "Batch execution completed",
+            extra={
+                "event": "batch_execution_completed",
+                "run_id": run_id,
+                "case_count": len(results),
+                "provider_name": provider.name,
+            },
+        )
         return results
 
     async def writer_loop(self, on_result: ResultWriter) -> None:

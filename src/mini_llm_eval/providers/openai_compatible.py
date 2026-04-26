@@ -10,9 +10,12 @@ import httpx
 
 from mini_llm_eval.core.config import ProviderConfig
 from mini_llm_eval.core.exceptions import ProviderError, ProviderInitError, ProviderTimeoutError
+from mini_llm_eval.core.logging import get_logger
 from mini_llm_eval.models.schemas import ProviderResponse, ProviderStatus, TokenUsage
 from mini_llm_eval.providers.base import BaseProvider
 from mini_llm_eval.providers.retry import with_retry
+
+logger = get_logger(__name__)
 
 
 class OpenAICompatibleProvider(BaseProvider):
@@ -34,6 +37,16 @@ class OpenAICompatibleProvider(BaseProvider):
         self._owns_client = client is None
         self._client = client or self._build_client()
         self._client.headers.update(self._build_headers())
+        logger.info(
+            "Initialized OpenAI-compatible provider",
+            extra={
+                "event": "provider_initialized",
+                "provider_name": self._name,
+                "provider_type": "openai_compatible",
+                "base_url": self._config.base_url,
+                "model_name": self._config.model,
+            },
+        )
 
     @property
     def name(self) -> str:
@@ -84,8 +97,20 @@ class OpenAICompatibleProvider(BaseProvider):
             return self._parse_response(response, latency_ms)
 
         try:
-            return await with_retry(send_request, max_retries=max_retries)
+            return await with_retry(
+                send_request,
+                max_retries=max_retries,
+                provider_name=self._name,
+            )
         except ProviderTimeoutError:
+            logger.warning(
+                "Provider request timed out",
+                extra={
+                    "event": "provider_timeout",
+                    "provider_name": self._name,
+                    "model_name": self._config.model,
+                },
+            )
             return ProviderResponse(
                 output="",
                 latency_ms=0,
@@ -94,6 +119,15 @@ class OpenAICompatibleProvider(BaseProvider):
                 model_name=self._config.model,
             )
         except ProviderError as exc:
+            logger.warning(
+                "Provider request failed",
+                extra={
+                    "event": "provider_error",
+                    "provider_name": self._name,
+                    "model_name": self._config.model,
+                    "error_code": str(exc),
+                },
+            )
             return ProviderResponse(
                 output="",
                 latency_ms=0,

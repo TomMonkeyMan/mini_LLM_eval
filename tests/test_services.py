@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 
 import pytest
 
@@ -124,6 +125,57 @@ async def test_run_service_start_run_completes_and_writes_meta(tmp_path) -> None
     assert meta["status"] == RunStatus.SUCCEEDED.value
     assert len(case_rows) == 2
     assert meta["summary"]["passed_cases"] == 2
+
+
+@pytest.mark.asyncio
+async def test_run_service_emits_run_lifecycle_logs(tmp_path, caplog) -> None:
+    mapping_path = tmp_path / "mock_mapping.json"
+    mapping_path.write_text(json.dumps({"Question A": "expected-a"}), encoding="utf-8")
+    dataset_path = tmp_path / "dataset.jsonl"
+    dataset_path.write_text(
+        json.dumps(
+            {
+                "case_id": "case-a",
+                "query": "Question A",
+                "expected_answer": "expected-a",
+                "eval_type": "contains",
+                "tags": ["knowledge"],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    db = Database(str(tmp_path / "eval.db"))
+    storage = FileStorage(output_dir=str(tmp_path / "outputs"))
+    service = RunService(
+        db=db,
+        file_storage=storage,
+        providers={
+            "mock-default": ProviderConfig.from_mapping(
+                {
+                    "type": "mock",
+                    "mapping_file": str(mapping_path),
+                }
+            )
+        },
+        config=Config(concurrency=1, timeout_ms=5000),
+    )
+
+    with caplog.at_level(logging.INFO):
+        await service.start_run(
+            RunConfig(
+                run_id="run-logs",
+                dataset_path=str(dataset_path),
+                provider_name="mock-default",
+                concurrency=1,
+                timeout_ms=5000,
+            )
+        )
+
+    events = {record.event for record in caplog.records if hasattr(record, "event")}
+    assert "run_execution_started" in events
+    assert "run_execution_completed" in events
 
 
 @pytest.mark.asyncio

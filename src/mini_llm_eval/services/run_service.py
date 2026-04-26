@@ -9,6 +9,7 @@ from typing import Any
 
 from mini_llm_eval.core.config import Config, ProviderConfig, get_config, get_providers
 from mini_llm_eval.core.exceptions import DatasetLoadError, PersistenceError, ProviderInitError
+from mini_llm_eval.core.logging import get_logger
 from mini_llm_eval.core.types import RunMeta
 from mini_llm_eval.db.database import Database
 from mini_llm_eval.db.file_storage import FileStorage
@@ -24,6 +25,8 @@ from mini_llm_eval.models.schemas import (
 from mini_llm_eval.providers.factory import create_provider
 from mini_llm_eval.services.dataset import load_dataset
 from mini_llm_eval.services.executor import Executor
+
+logger = get_logger(__name__)
 
 
 class RunService:
@@ -44,6 +47,16 @@ class RunService:
     async def start_run(self, run_config: RunConfig) -> str:
         """Create and execute a new run end to end."""
 
+        logger.info(
+            "Run execution started",
+            extra={
+                "event": "run_execution_started",
+                "run_id": run_config.run_id,
+                "dataset_path": run_config.dataset_path,
+                "provider_name": run_config.provider_name,
+                "concurrency": run_config.concurrency,
+            },
+        )
         await self.db.init()
         await self.db.create_run(run_config)
         await self.db.update_run_status(
@@ -75,6 +88,19 @@ class RunService:
             await self.db.complete_run(run_config.run_id, success=True, summary=summary)
             meta = await self._build_meta(run_config.run_id)
             self.file_storage.save_meta(run_config.run_id, meta)
+            logger.info(
+                "Run execution completed",
+                extra={
+                    "event": "run_execution_completed",
+                    "run_id": run_config.run_id,
+                    "provider_name": run_config.provider_name,
+                    "status": RunStatus.SUCCEEDED.value,
+                    "total_cases": summary["total_cases"],
+                    "passed_cases": summary["passed_cases"],
+                    "failed_cases": summary["failed_cases"],
+                    "error_cases": summary["error_cases"],
+                },
+            )
             return run_config.run_id
         except Exception as exc:
             await self.db.complete_run(
@@ -84,6 +110,15 @@ class RunService:
             )
             meta = await self._build_meta(run_config.run_id)
             self.file_storage.save_meta(run_config.run_id, meta)
+            logger.exception(
+                "Run execution failed",
+                extra={
+                    "event": "run_execution_failed",
+                    "run_id": run_config.run_id,
+                    "provider_name": run_config.provider_name,
+                    "status": RunStatus.FAILED.value,
+                },
+            )
             raise
         finally:
             if provider is not None:
@@ -92,6 +127,10 @@ class RunService:
     async def resume_run(self, run_id: str) -> str:
         """Resume a previously started run by skipping completed cases."""
 
+        logger.info(
+            "Run resume started",
+            extra={"event": "run_resume_started", "run_id": run_id},
+        )
         await self.db.init()
         run_record = await self.db.get_run(run_id)
         if run_record is None:
@@ -114,6 +153,16 @@ class RunService:
         cases = load_dataset(dataset_path)
         completed_case_ids = await self.db.get_completed_cases(run_id)
         remaining_cases = [case for case in cases if case.case_id not in completed_case_ids]
+        logger.info(
+            "Resolved resume workload",
+            extra={
+                "event": "run_resume_resolved",
+                "run_id": run_id,
+                "total_cases": len(cases),
+                "completed_cases": len(completed_case_ids),
+                "remaining_cases": len(remaining_cases),
+            },
+        )
 
         evaluator_map = self._load_evaluators(remaining_cases or cases)
         provider = None
@@ -146,11 +195,27 @@ class RunService:
             await self.db.complete_run(run_id, success=True, summary=summary)
             meta = await self._build_meta(run_id)
             self.file_storage.save_meta(run_id, meta)
+            logger.info(
+                "Run resume completed",
+                extra={
+                    "event": "run_resume_completed",
+                    "run_id": run_id,
+                    "status": RunStatus.SUCCEEDED.value,
+                    "total_cases": summary["total_cases"],
+                    "passed_cases": summary["passed_cases"],
+                    "failed_cases": summary["failed_cases"],
+                    "error_cases": summary["error_cases"],
+                },
+            )
             return run_id
         except Exception as exc:
             await self.db.complete_run(run_id, success=False, summary={"fatal_error": str(exc)})
             meta = await self._build_meta(run_id)
             self.file_storage.save_meta(run_id, meta)
+            logger.exception(
+                "Run resume failed",
+                extra={"event": "run_resume_failed", "run_id": run_id, "status": RunStatus.FAILED.value},
+            )
             raise
         finally:
             if provider is not None:

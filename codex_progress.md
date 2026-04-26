@@ -94,3 +94,19 @@
 - Consolidated CLI async execution so each command now uses a single `asyncio.run(...)` path instead of multiple event-loop entries.
 - Re-ran the full test suite in the Conda environment.
 - Current verified test count: `42` passing.
+- Added a minimal runtime logging system:
+  - new `core/logging.py` with JSON-line root logger setup
+  - new `log_level` config field with default `INFO`
+  - CLI now initializes logging from config
+- Added logging at key runtime boundaries:
+  - CLI command start / success / failure
+  - run start / complete / fail / resume
+  - batch execution start / complete
+  - provider retry / timeout / failure
+  - artifact fallback writes
+- Added logging tests for:
+  - JSON log formatting
+  - artifact fallback warning emission
+  - run lifecycle log events
+- Updated `README.md` and `config.yaml` to document runtime logging.
+- Current verified test count: `45` passing.

@@ -11,8 +11,11 @@ from typing import Any
 
 from mini_llm_eval.core.config import ProviderConfig
 from mini_llm_eval.core.exceptions import ProviderInitError
+from mini_llm_eval.core.logging import get_logger
 from mini_llm_eval.models.schemas import ProviderResponse, ProviderStatus
 from mini_llm_eval.providers.base import BaseProvider
+
+logger = get_logger(__name__)
 
 
 class MockProvider(BaseProvider):
@@ -28,6 +31,15 @@ class MockProvider(BaseProvider):
         self._config = config
         self._rng = rng or random.Random()
         self._mapping = self._load_mapping()
+        logger.info(
+            "Initialized mock provider",
+            extra={
+                "event": "provider_initialized",
+                "provider_name": self._name,
+                "provider_type": "mock",
+                "mapping_size": len(self._mapping),
+            },
+        )
 
     @property
     def name(self) -> str:

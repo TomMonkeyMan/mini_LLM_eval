@@ -19,6 +19,7 @@ from mini_llm_eval.core.config import (
     set_runtime_config,
 )
 from mini_llm_eval.core.exceptions import EvalRunnerException
+from mini_llm_eval.core.logging import get_logger, setup_logging
 from mini_llm_eval.core.types import RunRecord
 from mini_llm_eval.db.database import Database
 from mini_llm_eval.db.file_storage import FileStorage
@@ -27,6 +28,7 @@ from mini_llm_eval.services.run_service import RunService
 
 app = typer.Typer(help="Mini LLM evaluation runner CLI")
 console = Console()
+logger = get_logger(__name__)
 
 
 def _build_runtime(
@@ -35,6 +37,7 @@ def _build_runtime(
     db_path: str | None,
 ) -> tuple[Config, Database, RunService]:
     config = load_config(config_path)
+    setup_logging(config.log_level)
     providers = load_providers(providers_path)
     set_runtime_config(config=config, providers=providers)
 
@@ -106,6 +109,15 @@ def run(
     try:
         cfg, db, service = _build_runtime(config, providers, db_path)
         resolved_run_id = run_id or f"run-{uuid.uuid4().hex[:8]}"
+        logger.info(
+            "CLI run command started",
+            extra={
+                "event": "cli_run_started",
+                "run_id": resolved_run_id,
+                "dataset_path": dataset,
+                "provider_name": provider,
+            },
+        )
         run_config = RunConfig(
             run_id=resolved_run_id,
             dataset_path=dataset,
@@ -115,8 +127,20 @@ def run(
             max_retries=cfg.max_retries,
         )
         run_record = asyncio.run(_run_and_load_record(service, db, run_config))
+        logger.info(
+            "CLI run command completed",
+            extra={
+                "event": "cli_run_completed",
+                "run_id": resolved_run_id,
+                "status": run_record["status"],
+            },
+        )
         _print_run_summary(run_record)
     except EvalRunnerException as exc:
+        logger.exception(
+            "CLI run command failed",
+            extra={"event": "cli_run_failed", "run_id": run_id, "provider_name": provider},
+        )
         console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(code=1)
     finally:
@@ -134,9 +158,21 @@ def resume(
 
     try:
         _, db, service = _build_runtime(config, providers, db_path)
+        logger.info(
+            "CLI resume command started",
+            extra={"event": "cli_resume_started", "run_id": run_id},
+        )
         run_record = asyncio.run(_resume_and_load_record(service, db, run_id))
+        logger.info(
+            "CLI resume command completed",
+            extra={"event": "cli_resume_completed", "run_id": run_id, "status": run_record["status"]},
+        )
         _print_run_summary(run_record)
     except EvalRunnerException as exc:
+        logger.exception(
+            "CLI resume command failed",
+            extra={"event": "cli_resume_failed", "run_id": run_id},
+        )
         console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(code=1)
     finally:
@@ -153,11 +189,24 @@ def status(
 
     try:
         cfg = load_config(config)
+        setup_logging(cfg.log_level)
         resolved_db_path = db_path or str(Path(cfg.output_dir) / "eval.db")
         db = Database(resolved_db_path)
+        logger.info(
+            "CLI status command started",
+            extra={"event": "cli_status_started", "run_id": run_id},
+        )
         run_record = asyncio.run(_load_status_record(db, run_id))
+        logger.info(
+            "CLI status command completed",
+            extra={"event": "cli_status_completed", "run_id": run_id, "status": run_record["status"]},
+        )
         _print_run_summary(run_record)
     except EvalRunnerException as exc:
+        logger.exception(
+            "CLI status command failed",
+            extra={"event": "cli_status_failed", "run_id": run_id},
+        )
         console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(code=1)
 

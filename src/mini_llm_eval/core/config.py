@@ -38,6 +38,7 @@ class Config(BaseModel):
     timeout_ms: int = 30000
     max_retries: int = 3
     concurrency: int = 4
+    log_level: str = "INFO"
     output_dir: str = "./outputs"
     evaluators_package: str = "mini_llm_eval.evaluators"
     defaults: DefaultsConfig = Field(default_factory=DefaultsConfig)

@@ -7,7 +7,10 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from mini_llm_eval.core.logging import get_logger
 from mini_llm_eval.models.schemas import CaseResult
+
+logger = get_logger(__name__)
 
 
 class FileStorage:
@@ -38,6 +41,15 @@ class FileStorage:
             fallback_path = self._fallback_path(run_id, "case_results", suffix=".jsonl")
             with fallback_path.open("a", encoding="utf-8") as handle:
                 handle.write(payload + "\n")
+            logger.warning(
+                "Primary artifact write failed; using fallback path",
+                extra={
+                    "event": "artifact_fallback",
+                    "artifact_type": "case_results",
+                    "run_id": run_id,
+                    "fallback_path": str(fallback_path),
+                },
+            )
             return str(fallback_path)
 
     def save_meta(self, run_id: str, meta: dict[str, Any]) -> str:
@@ -53,6 +65,15 @@ class FileStorage:
         except OSError:
             fallback_path = self._fallback_path(run_id, "meta", suffix=".json")
             self._atomic_write(fallback_path, payload)
+            logger.warning(
+                "Primary artifact write failed; using fallback path",
+                extra={
+                    "event": "artifact_fallback",
+                    "artifact_type": "meta",
+                    "run_id": run_id,
+                    "fallback_path": str(fallback_path),
+                },
+            )
             return str(fallback_path)
 
     def read_json_lines(self, path: str) -> list[dict[str, Any]]:

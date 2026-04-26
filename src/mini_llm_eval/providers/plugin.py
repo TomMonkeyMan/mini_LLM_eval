@@ -10,10 +10,12 @@ from typing import Any, Awaitable, Callable
 
 from mini_llm_eval.core.config import ProviderConfig
 from mini_llm_eval.core.exceptions import ProviderInitError
+from mini_llm_eval.core.logging import get_logger
 from mini_llm_eval.models.schemas import ProviderResponse, ProviderStatus, TokenUsage
 from mini_llm_eval.providers.base import BaseProvider
 
 PluginGenerateFn = Callable[..., Awaitable[dict[str, Any]]]
+logger = get_logger(__name__)
 
 
 class PluginProvider(BaseProvider):
@@ -63,6 +65,15 @@ class PluginProvider(BaseProvider):
             raise ProviderInitError(f"Plugin provider must define async generate(): {plugin_path}")
         if not inspect.iscoroutinefunction(generate_fn):
             raise ProviderInitError(f"Plugin provider generate() must be async: {plugin_path}")
+        logger.info(
+            "Loaded plugin provider",
+            extra={
+                "event": "provider_initialized",
+                "provider_name": self._name,
+                "provider_type": "plugin",
+                "plugin_path": str(plugin_path),
+            },
+        )
         return generate_fn
 
     async def generate(self, query: str, **kwargs) -> ProviderResponse:

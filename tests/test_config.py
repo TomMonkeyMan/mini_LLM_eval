@@ -26,6 +26,7 @@ def test_load_config_returns_defaults_when_no_default_file_exists(
 
     assert isinstance(config, Config)
     assert config.timeout_ms == 30000
+    assert config.log_level == "INFO"
     assert config.defaults.evaluators == ["contains"]
 
 
@@ -48,6 +49,7 @@ def test_load_config_expands_environment_variables(tmp_path, monkeypatch) -> Non
 
     assert config.timeout_ms == 1234
     assert config.output_dir == "./tmp-output"
+    assert config.log_level == "INFO"
     assert config.defaults.evaluators == ["exact_match"]
 
 
