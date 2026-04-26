@@ -110,3 +110,11 @@
   - run lifecycle log events
 - Updated `README.md` and `config.yaml` to document runtime logging.
 - Current verified test count: `45` passing.
+- Added `docs/9_v1_report.md` to summarize:
+  - current v1 completion status
+  - mapping against historical `docs/3_plan_v0.1.md`
+  - deferred / replaced / still-pending work items
+- Rewrote `DEVELOPMENT.md` to align with current project reality:
+  - clarified document priority against `RULES.md` and `docs/7_v1_implementation_spec.md`
+  - removed idealized-but-unenforced rules
+  - separated hard constraints from recommendations and future tooling plans

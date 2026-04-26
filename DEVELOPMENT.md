@@ -1,573 +1,302 @@
-# Mini LLM Eval 开发规范
+# Mini LLM Eval Development Guide
 
-> 版本: v1.0
+> 版本: v1.1
 > 最后更新: 2026-04-26
-> 适用范围: 所有贡献者（人类 & AI）
+> 适用范围: 当前仓库的实际开发协作
 
 ---
 
-## 1. Python 版本与环境
+## 1. 文档定位
 
-```yaml
-python: ">=3.11"
-package_manager: pip / conda
-formatter: ruff format
-linter: ruff check
-type_checker: pyright (strict mode)
-```
+本文件不是通用编程守则，也不是未来愿景清单。
 
----
+它只回答三个问题：
 
-## 2. 代码风格
+1. 当前仓库已经采用了什么
+2. 当前开发时哪些约束应当遵守
+3. 哪些东西只是后续计划，当前不强制
 
-### 2.1 Import 规范
+文档优先级如下：
 
-```python
-# 1. 标准库（按字母排序）
-from __future__ import annotations  # 必须第一行
+1. `docs/7_v1_implementation_spec.md`
+   当前 v1 的权威实现规格
+2. `RULES.md`
+   通用工程行为守则
+3. `DEVELOPMENT.md`
+   当前仓库的实际开发约束和建议
 
-import asyncio
-import json
-from collections import defaultdict
-from pathlib import Path
-from typing import Any
-
-# 2. 第三方库
-import httpx
-from pydantic import BaseModel, Field
-
-# 3. 项目内部
-from mini_llm_eval.core.config import Config
-from mini_llm_eval.core.exceptions import EvalRunnerException
-from mini_llm_eval.models.schemas import CaseResult
-```
-
-### 2.2 类型注解
-
-```python
-# ✅ 使用 Python 3.10+ 语法
-def process(items: list[str]) -> dict[str, int]: ...
-def get_user(id: int) -> User | None: ...
-
-# ❌ 不使用旧语法
-from typing import List, Dict, Optional  # 不需要
-def process(items: List[str]) -> Dict[str, int]: ...
-```
-
-### 2.3 字符串格式化
-
-```python
-# ✅ f-string（首选）
-message = f"Run {run_id} completed with {count} cases"
-
-# ✅ 多行 f-string
-query = f"""
-    SELECT * FROM runs
-    WHERE run_id = {run_id!r}
-    AND status = {status!r}
-"""
-
-# ❌ 不使用 .format() 或 %
-message = "Run {} completed".format(run_id)  # 避免
-message = "Run %s completed" % run_id  # 避免
-```
+如果本文件与 `docs/7_v1_implementation_spec.md` 冲突，以规格文档为准。
 
 ---
 
-## 3. 类设计规范
+## 2. 当前项目现实
 
-### 3.1 `__slots__` 规则
+当前仓库已经采用的技术与结构如下：
 
-**所有非 Pydantic 类必须定义 `__slots__`**：
+- Python `3.11`
+- 包结构：`src/mini_llm_eval/`
+- 配置：YAML + Pydantic
+- 数据库：`aiosqlite`
+- CLI：`typer` + `rich`
+- HTTP Provider：`httpx.AsyncClient`
+- 测试：`pytest` + `pytest-asyncio`
+- 运行时日志：标准库 `logging`，JSON line 输出
 
-```python
-# ✅ 正确
-class Executor:
-    __slots__ = ('_semaphore', '_timeout_ms', '_queue', '_sentinel')
+当前核心模块边界如下：
 
-    def __init__(self, concurrency: int = 4, timeout_ms: int = 30000):
-        self._semaphore = asyncio.Semaphore(concurrency)
-        self._timeout_ms = timeout_ms
-        ...
-
-# ❌ 错误 - 缺少 __slots__
-class Executor:
-    def __init__(self, concurrency: int = 4):
-        self.semaphore = asyncio.Semaphore(concurrency)
-```
-
-**例外**：
-- Pydantic `BaseModel` 子类（Pydantic 自己管理）
-- 需要动态属性的类（必须注释说明原因）
-
-### 3.2 属性命名规范
-
-| 类型 | 前缀 | 示例 | 说明 |
-|------|------|------|------|
-| 私有属性 | `_` | `self._client` | 内部创建的资源 |
-| 公开属性 | 无 | `self.db` | 外部传入的依赖 |
-| 类常量 | `_` + 大写 | `_SENTINEL` | 类级别常量 |
-| 模块常量 | 大写 | `SCHEMA` | 模块级别常量 |
-
-```python
-class RunService:
-    __slots__ = ('db', 'file_storage', '_config', '_providers')
-
-    def __init__(
-        self,
-        db: Database,                    # 依赖注入 -> 公开
-        file_storage: FileStorage,       # 依赖注入 -> 公开
-        config: Config | None = None,    # 内部使用 -> 私有
-    ):
-        self.db = db
-        self.file_storage = file_storage
-        self._config = config or get_config()
-```
-
-### 3.3 资源管理
-
-**使用 async context manager 管理资源**：
-
-```python
-from contextlib import asynccontextmanager
-
-class RunService:
-    @asynccontextmanager
-    async def _managed_provider(self, provider_name: str):
-        """Context manager for provider lifecycle."""
-        provider = self._create_provider(provider_name)
-        try:
-            yield provider
-        finally:
-            await provider.close()
-
-    async def start_run(self, run_config: RunConfig) -> str:
-        async with self._managed_provider(run_config.provider_name) as provider:
-            results = await executor.execute_batch(...)
-```
+- `core`
+  - 配置
+  - 异常
+  - logging
+  - shared types
+- `models`
+  - Pydantic schemas
+- `providers`
+  - provider 抽象
+  - factory
+  - 内置 provider
+  - plugin provider
+- `evaluators`
+  - evaluator 抽象
+  - registry
+  - 内置规则
+- `services`
+  - dataset loader
+  - executor
+  - run service
+- `db`
+  - SQLite persistence
+  - file artifact storage
+- `cli`
+  - run / resume / status
 
 ---
 
-## 4. 类型定义规范
+## 3. 当前强约束
 
-### 4.1 TypedDict 用于结构化返回
+下面这些是当前仓库开发时应当直接遵守的。
 
-```python
-# src/mini_llm_eval/core/types.py
+### 3.1 范围约束
 
-from typing import TypedDict
+v1 当前不做：
 
-class RunRecord(TypedDict):
-    """Database run record structure."""
-    run_id: str
-    dataset_path: str
-    provider_name: str
-    model_config_json: str
-    status: str
-    summary_json: str | None
-    created_at: str
-    started_at: str | None
-    finished_at: str | None
+- compare
+- FastAPI / HTTP API
+- Web UI
+- 分布式队列
+- 可视化报表
 
-class CaseResultRecord(TypedDict):
-    """Database case result record structure."""
-    id: int
-    run_id: str
-    case_id: str
-    status: str
-    output_path: str | None
-    eval_results_json: str
-    latency_ms: float
-    error: str | None
-    payload_json: str
-    created_at: str
-```
+如果新改动会把代码明显往这些方向扩展，默认不做，除非明确提出。
 
-### 4.2 Protocol 用于接口定义
+### 3.2 架构约束
 
-```python
-from typing import Protocol
+依赖方向保持单向：
 
-class ResultWriter(Protocol):
-    """Protocol for result writing callback."""
-    async def __call__(self, result: CaseResult) -> None: ...
+`cli -> services -> providers/evaluators/db -> core/models`
 
-class ProviderProtocol(Protocol):
-    """Protocol for model providers."""
-    @property
-    def name(self) -> str: ...
-    async def generate(self, query: str, **kwargs) -> ProviderResponse: ...
-    async def close(self) -> None: ...
-```
+具体要求：
 
----
+- CLI 不直接编排 Provider 或数据库细节
+- Provider 不依赖 CLI
+- Evaluator 不依赖具体 Provider
+- 数据库层不承载业务编排逻辑
+- 可复用能力优先放在 service 层
 
-## 5. 错误处理规范
+### 3.3 Provider 约束
 
-### 5.1 异常层次
+当前 Provider 体系采用：
 
-```python
-# src/mini_llm_eval/core/exceptions.py
+- config-driven provider 配置
+- `factory.py` 创建 provider
+- plugin provider 作为用户扩展入口
 
-class EvalRunnerException(Exception):
-    """Base exception for all project errors."""
-    pass
+因此：
 
-# 致命错误 - 导致 run 失败
-class DatasetLoadError(EvalRunnerException): ...
-class ProviderInitError(EvalRunnerException): ...
-class PersistenceError(EvalRunnerException): ...
+- 不要再引入第二套内部 `ProviderRegistry` 机制
+- 新增 provider 时优先遵守当前 factory / config 模式
+- HTTP 型 provider 默认按异步远程服务处理
 
-# 可重试错误
-class ProviderError(EvalRunnerException): ...
-class ProviderTimeoutError(ProviderError): ...
+### 3.4 状态与产物约束
 
-# 记录但不中断
-class EvaluatorError(EvalRunnerException): ...
-class InvalidTransitionError(EvalRunnerException): ...
-```
+Run 状态语义固定为：
 
-### 5.2 异常链
+- `PENDING`
+- `RUNNING`
+- `SUCCEEDED`
+- `FAILED`
+- `CANCELLED`
 
-```python
-# ✅ 保留原始异常信息
-try:
-    result = do_something()
-except ValueError as exc:
-    raise ConfigError(f"Invalid config: {exc}") from exc
+Case 状态语义固定为：
 
-# ❌ 丢失异常链
-except ValueError as exc:
-    raise ConfigError(f"Invalid config: {exc}")
-```
+- `PENDING`
+- `COMPLETED`
+- `ERROR`
 
-### 5.3 错误消息格式
+当前 v1 的结果产物约定为：
 
-```python
-# 格式: "[组件] 动作失败: 原因"
-raise ProviderInitError("openai_compatible provider requires base_url")
-raise PersistenceError(f"Failed to query run {run_id}: {exc}")
-raise EvaluatorError(f"Unknown evaluator: {name}")
-```
+- `outputs/{run_id}/case_results.jsonl`
+- `outputs/{run_id}/meta.json`
+
+新改动不要破坏这两个产物入口。
+
+### 3.5 日志约束
+
+当前运行时日志采用标准库 `logging`。
+
+要求：
+
+- 使用 `mini_llm_eval.core.logging`
+- 输出结构化字段，适合 JSON line 消费
+- 关键事件必须带稳定字段，例如：
+  - `event`
+  - `run_id`
+  - `case_id`
+  - `provider_name`
+  - `status`
+
+不要在当前阶段再引入 `structlog` 或第二套日志框架。
+
+### 3.6 持久化约束
+
+当前数据库层采用 `aiosqlite` 原生 SQL。
+
+因此：
+
+- 不要引入 SQLAlchemy 作为当前 v1 的默认实现
+- 小型持久化逻辑可以继续留在 `database.py`
+- 文件产物输出继续由 `file_storage.py` 负责
 
 ---
 
-## 6. 文档规范
+## 4. 当前推荐实践
 
-### 6.1 模块 docstring
+下面这些是推荐做法，但不是“写了别的就一定错”。
 
-```python
-"""SQLite persistence layer.
+### 4.1 类型
 
-This module provides async SQLite operations for run metadata,
-case results, and state transition logging.
+- 优先使用 Python 3.10+ 原生类型写法
+  - `list[str]`
+  - `dict[str, Any]`
+  - `User | None`
+- 稳定结构优先使用 `TypedDict`
+  - 例如 DB record
+  - run meta
+  - summary payload
 
-Example:
-    db = Database("eval.db")
-    await db.init()
-    await db.create_run(run_config)
-"""
-```
+### 4.2 错误处理
 
-### 6.2 类 docstring
+- 项目异常优先继承现有异常体系
+- 保留异常链：`raise X(...) from exc`
+- 用户可见错误消息要具体，直接说明失败动作和对象
 
-```python
-class Executor:
-    """Execute evaluation cases with bounded provider concurrency.
+### 4.3 测试
 
-    This class manages the parallel execution of evaluation cases,
-    controlling provider concurrency via semaphore and serializing
-    result writes through a queue.
+有改动时，优先补最靠近改动点的测试。
 
-    Attributes:
-        _semaphore: Limits concurrent provider calls.
-        _timeout_ms: Per-case timeout in milliseconds.
+当前重点测试面：
 
-    Example:
-        executor = Executor(concurrency=4, timeout_ms=30000)
-        results = await executor.execute_batch(...)
-    """
-```
+- config
+- schemas
+- providers
+- evaluators
+- dataset
+- services
+- storage
+- cli
+- logging
 
-### 6.3 函数 docstring（Google 风格）
+规则：
 
-```python
-async def execute_batch(
-    self,
-    run_id: str,
-    cases: list[EvalCase],
-    provider: BaseProvider,
-    evaluators: dict[str, BaseEvaluator],
-    on_result: ResultWriter,
-) -> list[CaseResult]:
-    """Execute cases concurrently with bounded provider concurrency.
+- 修 bug，优先补回归测试
+- 加 evaluator / provider，至少补对应模块测试
+- 改 CLI 路径，至少跑 `tests/test_cli.py`
+- 改核心编排路径，至少跑 `tests/test_services.py`
 
-    Args:
-        run_id: Unique identifier for this run.
-        cases: List of evaluation cases to process.
-        provider: Model provider instance for generating responses.
-        evaluators: Mapping from evaluator name to instance.
-        on_result: Async callback for persisting results.
+### 4.4 文档
 
-    Returns:
-        List of case results in completion order.
+- 公开模块建议写简短 docstring
+- 对外可用的新能力，需要更新 `README.md`
+- 如果涉及范围、架构、产物格式变化，需要同步看 `docs/7_v1_implementation_spec.md`
 
-    Raises:
-        EvaluatorError: If a required evaluator is not registered.
+### 4.5 代码风格
 
-    Example:
-        results = await executor.execute_batch(
-            run_id="run-123",
-            cases=cases,
-            provider=provider,
-            evaluators={"contains": ContainsEvaluator()},
-            on_result=db.save_case_result,
-        )
-    """
-```
-
-### 6.4 何时需要完整 docstring
-
-| 情况 | docstring 要求 |
-|------|----------------|
-| 公开 API（`__init__`, 公开方法） | 完整（Args, Returns, Raises） |
-| 私有方法 `_xxx` | 一行简述即可 |
-| 显而易见的方法（getter） | 可省略 |
-| 复杂算法 | 必须详细说明 |
+- 默认保持现有代码风格，不做无关统一
+- import 顺序、命名、注释保持一致即可
+- 不要求当前仓库所有类统一加 `__slots__`
+- 不要求所有公开方法都补 Google 风格长 docstring
 
 ---
 
-## 7. 测试规范
+## 5. 当前不强制的事项
 
-### 7.1 测试文件命名
+下面这些可以作为后续工程化方向，但当前不应写成硬性规定：
 
-```
-tests/
-├── test_config.py           # 测试 core/config.py
-├── test_schemas.py          # 测试 models/schemas.py
-├── test_evaluators.py       # 测试 evaluators/
-├── test_providers.py        # 测试 providers/
-├── test_database.py         # 测试 db/database.py
-├── test_executor.py         # 测试 services/executor.py
-├── test_run_service.py      # 测试 services/run_service.py
-├── test_cli.py              # 测试 cli/
-└── conftest.py              # 共享 fixtures
-```
+- `ruff format`
+- `ruff check`
+- `pyright strict`
+- `pre-commit`
+- 全项目统一 `__slots__`
+- 全项目统一 async context manager 包装
+- 全项目统一长 docstring 模板
+- Protocol 全覆盖
+- 按理想目录重拆测试文件
 
-### 7.2 测试函数命名
+这些事项如果后续真的要落地，应先：
 
-```python
-# 格式: test_<module>_<scenario>_<expected_outcome>
-def test_config_load_missing_file_returns_default(): ...
-def test_executor_timeout_returns_error_result(): ...
-def test_run_service_resume_skips_completed_cases(): ...
-```
+1. 明确决定采用
+2. 在仓库里实际配置好
+3. 再把它升级为强约束
 
-### 7.3 Fixture 规范
-
-```python
-# conftest.py
-import pytest
-from pathlib import Path
-
-@pytest.fixture
-def tmp_db(tmp_path: Path) -> Path:
-    """Temporary database path."""
-    return tmp_path / "test.db"
-
-@pytest.fixture
-def sample_cases() -> list[EvalCase]:
-    """Sample evaluation cases for testing."""
-    return [
-        EvalCase(case_id="case-1", query="Q1", expected_answer="A1"),
-        EvalCase(case_id="case-2", query="Q2", expected_answer="A2"),
-    ]
-```
-
-### 7.4 Async 测试
-
-```python
-import pytest
-
-@pytest.mark.asyncio
-async def test_database_create_run(tmp_db: Path):
-    db = Database(str(tmp_db))
-    await db.init()
-    run_id = await db.create_run(run_config)
-    assert run_id == run_config.run_id
-```
+在那之前，它们只能算 planned，不算 enforced。
 
 ---
 
-## 8. Git 规范
+## 6. 提交与协作
 
-### 8.1 分支命名
+### 6.1 Commit 原则
 
-```
-main              # 稳定版本
-dev               # 开发分支
-feature/xxx       # 新功能
-fix/xxx           # Bug 修复
-refactor/xxx      # 重构
-docs/xxx          # 文档更新
-```
+- commit 保持单一主题
+- 不把无关文件混进来
+- review 文件默认不要提交，除非明确要求
+- 文档改动和代码改动可以同 commit，但要高度相关
 
-### 8.2 Commit 消息格式
+### 6.2 Review 关注点
 
-```
-<type>: <subject>
+当前 review 优先关注：
 
-<body>
+- 是否符合 v1 范围
+- 是否破坏现有模块边界
+- 是否引入不必要复杂度
+- 是否补了必要测试
+- 是否破坏状态语义或结果产物格式
 
-<footer>
-```
+不要把 review 重点放在：
 
-**Type**:
-- `feat`: 新功能
-- `fix`: Bug 修复
-- `refactor`: 重构（无功能变化）
-- `docs`: 文档
-- `test`: 测试
-- `chore`: 构建/依赖/配置
-
-**示例**:
-
-```
-feat: add plugin provider support
-
-- Implement PluginProvider class for dynamic loading
-- Support plugins_dir configuration
-- Add tests for plugin loading and validation
-
-Closes #123
-```
-
-### 8.3 PR 规范
-
-```markdown
-## Summary
-- 1-3 bullet points describing changes
-
-## Changes
-- [ ] Added X
-- [ ] Modified Y
-- [ ] Removed Z
-
-## Test Plan
-- [ ] Unit tests pass
-- [ ] Manual testing done
-
-## Related Issues
-Closes #xxx
-```
+- 为了风格而风格的重构
+- 当前未落地工具链的“违规”
+- 和当前架构路线不一致的理想化建议
 
 ---
 
-## 9. 性能规范
+## 7. 建议工作流
 
-### 9.1 避免的模式
+一个比较适合当前仓库的开发顺序是：
 
-```python
-# ❌ 循环中重复创建对象
-for case in cases:
-    evaluator = ContainsEvaluator()  # 每次创建新实例
-    result = evaluator.evaluate(...)
-
-# ✅ 复用对象
-evaluator = ContainsEvaluator()
-for case in cases:
-    result = evaluator.evaluate(...)
-```
-
-```python
-# ❌ 不必要的完整序列化
-payload = result.model_dump(mode="json")
-json_str = json.dumps(payload)
-
-# ✅ 直接序列化
-json_str = result.model_dump_json()
-```
-
-### 9.2 并发控制
-
-```python
-# ✅ 使用 Semaphore 限制并发
-semaphore = asyncio.Semaphore(concurrency)
-async with semaphore:
-    result = await provider.generate(query)
-
-# ❌ 无限并发
-tasks = [provider.generate(q) for q in queries]
-await asyncio.gather(*tasks)  # 可能压垮服务
-```
-
-### 9.3 内存管理
-
-```python
-# ✅ 流式处理大数据集
-async for result in executor.stream_results():
-    await db.save(result)
-
-# ❌ 全部加载到内存
-results = await executor.get_all_results()
-for result in results:
-    await db.save(result)
-```
+1. 先确认需求是否属于 v1 范围
+2. 找到会受影响的模块边界
+3. 优先做最小实现
+4. 补对应测试
+5. 跑受影响测试，必要时跑全量
+6. 更新 README 或相关 docs
+7. 再提交
 
 ---
 
-## 10. 检查清单
+## 8. 一句话原则
 
-### 新增类检查清单
+当前项目最重要的不是“把文档写得像一个成熟大平台”，而是：
 
-- [ ] 定义了 `__slots__`？
-- [ ] 属性命名符合规范（公开 vs 私有）？
-- [ ] 有类 docstring？
-- [ ] 返回类型有 TypedDict 约束？
-- [ ] 资源使用 context manager 管理？
-
-### 新增函数检查清单
-
-- [ ] 有完整类型注解？
-- [ ] 公开 API 有 docstring？
-- [ ] 异常链正确（`from exc`）？
-- [ ] 有对应的单元测试？
-
-### PR 检查清单
-
-- [ ] 所有测试通过？
-- [ ] 代码格式化（`ruff format`）？
-- [ ] 类型检查通过（`pyright`）？
-- [ ] 文档已更新？
-
----
-
-## 11. 工具配置
-
-### pyproject.toml
-
-```toml
-[tool.ruff]
-target-version = "py311"
-line-length = 100
-select = ["E", "F", "I", "W", "UP", "B", "SIM"]
-
-[tool.ruff.isort]
-known-first-party = ["mini_llm_eval"]
-
-[tool.pyright]
-pythonVersion = "3.11"
-typeCheckingMode = "strict"
-```
-
-### .pre-commit-config.yaml
-
-```yaml
-repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.0
-    hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff-format
-```
+- 保持 v1 核心路径稳定
+- 保持架构方向一致
+- 不提前引入 v2/v3 的复杂度
+- 每次改动都真实、可验证、可维护
