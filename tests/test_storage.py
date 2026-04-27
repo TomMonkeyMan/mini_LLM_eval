@@ -83,6 +83,33 @@ async def test_database_saves_case_results_and_completed_cases(tmp_path) -> None
     assert json.loads(rows[0]["payload_json"])["actual_output"] == "world"
 
 
+@pytest.mark.asyncio
+async def test_database_update_run_status_sets_started_and_finished_timestamps(tmp_path) -> None:
+    db = Database(str(tmp_path / "eval.db"))
+    await db.init()
+    await db.create_run(
+        RunConfig(
+            run_id="run-1",
+            dataset_path="data/eval_cases.jsonl",
+            provider_name="mock-default",
+        )
+    )
+
+    await db.update_run_status("run-1", RunStatus.RUNNING.value, event="run_started")
+    running_record = await db.get_run("run-1")
+
+    assert running_record is not None
+    assert running_record["started_at"] is not None
+    assert running_record["finished_at"] is None
+
+    await db.update_run_status("run-1", RunStatus.SUCCEEDED.value, event="run_completed")
+    finished_record = await db.get_run("run-1")
+
+    assert finished_record is not None
+    assert finished_record["started_at"] is not None
+    assert finished_record["finished_at"] is not None
+
+
 def test_file_storage_writes_case_results_and_meta(tmp_path) -> None:
     storage = FileStorage(output_dir=str(tmp_path / "outputs"))
     result = CaseResult(

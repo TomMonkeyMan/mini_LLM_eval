@@ -196,6 +196,12 @@ class Database:
     ) -> None:
         """Update run status with transition validation."""
 
+        set_started = status == RunStatus.RUNNING.value
+        set_finished = status in {
+            RunStatus.SUCCEEDED.value,
+            RunStatus.FAILED.value,
+            RunStatus.CANCELLED.value,
+        }
         try:
             async with aiosqlite.connect(self.db_path) as db:
                 await self._update_run_status_in_tx(
@@ -204,6 +210,8 @@ class Database:
                     new_status=status,
                     event=event,
                     message=message,
+                    set_started=set_started,
+                    set_finished=set_finished,
                 )
                 await db.commit()
         except aiosqlite.Error as exc:

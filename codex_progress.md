@@ -170,6 +170,10 @@
 - Added provider logging regression tests for:
   - structured 4xx error details
   - truncated large error responses
+- Fixed run timestamp persistence for the normal execution path:
+  - `update_run_status()` now auto-populates `started_at` when entering `running`
+  - terminal status updates now auto-populate `finished_at`
+  - added regression coverage for timestamp writes on state transitions
 - Added CLI tests covering:
   - listing recent runs
   - showing failed-only case results
