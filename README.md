@@ -489,11 +489,25 @@ python -m pytest
 - services
 - CLI
 
+## Demo
+
+仓库中提供了一套可直接查看的 demo：
+
+- [demo/README.md](/Users/tiashi/Desktop/mini_LLM_eval/demo/README.md)
+- [demo/quickstart/README.md](/Users/tiashi/Desktop/mini_LLM_eval/demo/quickstart/README.md)
+- [demo/sample_runs/run-baseline/meta.json](/Users/tiashi/Desktop/mini_LLM_eval/demo/sample_runs/run-baseline/meta.json)
+- [demo/sample_runs/run-candidate/meta.json](/Users/tiashi/Desktop/mini_LLM_eval/demo/sample_runs/run-candidate/meta.json)
+
+可以直接运行：
+
+```bash
+mini-llm-eval compare demo/sample_runs/run-baseline demo/sample_runs/run-candidate
+```
+
 ## 当前限制
 
 当前版本仍有这些边界：
 
-- 不包含实验对比功能
 - 不包含 HTTP API
 - 不包含 Web UI
 - 不包含 LLM Judge

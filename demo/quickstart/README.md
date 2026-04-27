@@ -19,7 +19,7 @@ quickstart/
 
 ```bash
 # 1. 进入项目目录
-cd examples/quickstart
+cd demo/quickstart
 
 # 2. 运行评测（使用 mock provider）
 mini-llm-eval run --dataset data/sample.jsonl --provider mock-echo

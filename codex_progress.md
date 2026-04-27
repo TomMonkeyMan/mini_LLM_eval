@@ -182,6 +182,11 @@
   - accepts JSON payloads wrapped in Markdown code fences
   - keeps strict JSON validation after fence normalization
   - added regression coverage for fenced JSON responses
+- Added raw-requirement delivery completion artifacts:
+  - new `docs/12_raw_requirement_gap_report.md`
+  - consolidated project examples under `demo/`
+  - new `demo/` walkthrough with quickstart, sample dataset, two run artifacts, and compare example
+  - updated README to point to the demo entry
 - Added CLI tests covering:
   - listing recent runs
   - showing failed-only case results
