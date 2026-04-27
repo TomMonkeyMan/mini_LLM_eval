@@ -17,3 +17,28 @@ logging部分可以最后AI 统一检查。
 logging要求 标准库 logging 即可，json 比较好，后续兼容其他系统。日志字段统一。
 
 
+
+
+
+状态机，running run的部分现在似乎 ctrl + C 就可以，一定要做 需要中断 executor + 等待 tasks + 清理资源。后续 真的拆开 provider 和 evaluator 以后可以再做，在队列里面实现，可以参考 prefect的编排。
+
+
+
+logging部分有问题，ERROR 没有正确对应所有的错误。httpx 会把请求访问日志记成 INFO，但是业务逻辑没有 处理 ERROR。
+
+
+结果展示 Created 和 Started，Started 遗漏，检查状态机，代码层面未打点 or 数据库层面遗漏。
+
+
+
+限流 应该仅对于 provider，这部分是不打挂上游或者 谷歌api的 429。token-bucket即可，或者更简单。
+
+
+
+评测报告输出为 Markdown / HTML。渲染层，在数据分析层之上。
+
+后续为 provider层/eval层/analysis层/reporter层。
+
+
+
+

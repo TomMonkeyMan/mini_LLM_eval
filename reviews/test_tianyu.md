@@ -7,6 +7,15 @@ contains_all 必须包含所有关键词 (AND) 正确知识：确保关键信息
 length_range 回答长度范围 检测过短/过长回答  
 
 
-失败的case 应该单独记录！
+失败的case 应该单独记录，或者被--status调取。
+
+
+输出数据结构ok，可以抽象成dataclass，然后冻结。
+
+
+
+
+
+
 
 
