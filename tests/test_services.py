@@ -8,6 +8,7 @@ import logging
 import pytest
 
 from mini_llm_eval.core.config import Config, ProviderConfig
+from mini_llm_eval.core.exceptions import PersistenceError
 from mini_llm_eval.db.database import Database
 from mini_llm_eval.db.file_storage import FileStorage
 from mini_llm_eval.evaluators.contains import ContainsEvaluator
@@ -273,6 +274,59 @@ async def test_run_service_resume_skips_completed_cases(tmp_path) -> None:
     assert resumed_run_id == "run-1"
     assert len(rows) == 2
     assert meta["summary"]["passed_cases"] == 2
+
+
+@pytest.mark.asyncio
+async def test_run_service_cancel_pending_run(tmp_path) -> None:
+    db = Database(str(tmp_path / "eval.db"))
+    storage = FileStorage(output_dir=str(tmp_path / "outputs"))
+    service = RunService(
+        db=db,
+        file_storage=storage,
+        providers={},
+        config=Config(concurrency=1, timeout_ms=5000),
+    )
+    run_config = RunConfig(
+        run_id="run-cancel",
+        dataset_path="data/eval_cases.jsonl",
+        provider_name="mock-default",
+    )
+
+    await db.init()
+    await db.create_run(run_config)
+
+    cancelled_run_id = await service.cancel_run("run-cancel")
+    run_record = await db.get_run(cancelled_run_id)
+    meta = storage.read_json(str(tmp_path / "outputs" / cancelled_run_id / "meta.json"))
+
+    assert cancelled_run_id == "run-cancel"
+    assert run_record is not None
+    assert run_record["status"] == RunStatus.CANCELLED.value
+    assert meta["status"] == RunStatus.CANCELLED.value
+
+
+@pytest.mark.asyncio
+async def test_run_service_cancel_rejects_running_run(tmp_path) -> None:
+    db = Database(str(tmp_path / "eval.db"))
+    storage = FileStorage(output_dir=str(tmp_path / "outputs"))
+    service = RunService(
+        db=db,
+        file_storage=storage,
+        providers={},
+        config=Config(concurrency=1, timeout_ms=5000),
+    )
+    run_config = RunConfig(
+        run_id="run-running",
+        dataset_path="data/eval_cases.jsonl",
+        provider_name="mock-default",
+    )
+
+    await db.init()
+    await db.create_run(run_config)
+    await db.update_run_status("run-running", RunStatus.RUNNING.value, event="run_started")
+
+    with pytest.raises(PersistenceError, match="active cancellation is not supported in v1"):
+        await service.cancel_run("run-running")
 
 
 @pytest.mark.asyncio

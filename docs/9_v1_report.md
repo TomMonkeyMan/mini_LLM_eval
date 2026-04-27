@@ -109,7 +109,7 @@
 | Provider 注册机制 | 部分完成 | 没有做 `ProviderRegistry`，改为 config-driven factory + plugin provider |
 | 日志系统实现方式 | 部分完成 | 没有采用 `structlog`，实际采用标准 `logging` JSON 输出 |
 | Database 设计 | 部分完成 | 没有用 SQLAlchemy / repository/db_models，实际采用 `aiosqlite` 原生 SQL |
-| 取消能力 | 部分完成 | 数据库层已有 `cancel_run()`，但 Service/CLI 未完整打通 |
+| 取消能力 | 部分完成 | 当前已支持取消 `PENDING` run；主动中断 `RUNNING` run 仍未实现 |
 | 运行指标 | 部分完成 | summary 已生成，但没有单独 `run_metrics` 表 |
 
 ### 3.3 明确未做
@@ -216,7 +216,7 @@
 
 - 增加 CLI `list` 命令，查看历史 runs
 - 增加 CLI `show` 命令，查看单次 run 的 case 结果
-- 打通 `cancel_run()` 的 Service + CLI 支持
+- 评估是否将当前 `PENDING` 取消扩展为真正可中断的 `RUNNING` 取消
 - 为日志增加更统一的事件字段约束
 - 将 summary / meta / DB records 的类型继续收紧
 

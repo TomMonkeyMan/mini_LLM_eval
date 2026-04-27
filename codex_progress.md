@@ -118,3 +118,20 @@
   - clarified document priority against `RULES.md` and `docs/7_v1_implementation_spec.md`
   - removed idealized-but-unenforced rules
   - separated hard constraints from recommendations and future tooling plans
+- Added CLI query commands for existing run data:
+  - `list` to show recent runs
+  - `show` to inspect a run and optionally display case-level results
+- Added database support for recent run listing.
+- Added minimal cancellation support:
+  - `RunService.cancel_run()`
+  - CLI `cancel` command
+  - reliable for `PENDING` runs
+  - explicit rejection for active `RUNNING` cancellation in v1
+- Added CLI tests covering:
+  - listing recent runs
+  - showing failed-only case results
+  - cancelling a pending run
+  - rejecting active running cancellation
+- Updated `README.md` to document `list` and `show`.
+- Updated `README.md` to document `cancel` and its v1 limitation.
+- Current verified test count: `50` passing for the last full run; targeted `services + cli` tests also pass after cancel support.

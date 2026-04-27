@@ -43,6 +43,9 @@
   - `run`
   - `resume`
   - `status`
+  - `list`
+  - `show`
+  - `cancel`
 
 ## 项目结构
 
@@ -218,6 +221,30 @@ mini-llm-eval status demo-run \
 mini-llm-eval --help
 mini-llm-eval run --help
 ```
+
+### 5. 列最近 runs
+
+```bash
+mini-llm-eval list --limit 10 --config config.yaml
+```
+
+### 6. 查看单次 run 详情
+
+```bash
+mini-llm-eval show demo-run --config config.yaml
+mini-llm-eval show demo-run --cases --failed-only --config config.yaml
+```
+
+### 7. 取消 pending run
+
+```bash
+mini-llm-eval cancel demo-run --config config.yaml --providers providers.yaml
+```
+
+说明：
+
+- 当前 v1 只可靠支持取消 `PENDING` run
+- 已经进入 `RUNNING` 的 run 暂不支持主动中断
 
 ## 输出结果
 

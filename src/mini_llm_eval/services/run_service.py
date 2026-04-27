@@ -221,6 +221,37 @@ class RunService:
             if provider is not None:
                 await provider.close()
 
+    async def cancel_run(self, run_id: str) -> str:
+        """Cancel a pending run."""
+
+        logger.info(
+            "Run cancellation requested",
+            extra={"event": "run_cancel_requested", "run_id": run_id},
+        )
+        await self.db.init()
+        run_record = await self.db.get_run(run_id)
+        if run_record is None:
+            raise PersistenceError(f"Run not found: {run_id}")
+
+        status = run_record["status"]
+        if status == RunStatus.CANCELLED.value:
+            return run_id
+        if status in {RunStatus.SUCCEEDED.value, RunStatus.FAILED.value}:
+            raise PersistenceError(f"Run {run_id} cannot be cancelled from status {status}")
+        if status == RunStatus.RUNNING.value:
+            raise PersistenceError(
+                f"Run {run_id} is already running; active cancellation is not supported in v1"
+            )
+
+        await self.db.cancel_run(run_id, message="Run cancelled before execution started")
+        meta = await self._build_meta(run_id)
+        self.file_storage.save_meta(run_id, meta)
+        logger.info(
+            "Run cancelled",
+            extra={"event": "run_cancel_completed", "run_id": run_id, "status": RunStatus.CANCELLED.value},
+        )
+        return run_id
+
     async def _persist_result(self, result: CaseResult) -> None:
         artifact_path = self.file_storage.append_case_result(result.run_id, result)
         persisted_result = result.model_copy(update={"output_path": artifact_path})

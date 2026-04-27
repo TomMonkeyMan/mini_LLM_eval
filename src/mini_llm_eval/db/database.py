@@ -295,6 +295,26 @@ class Database:
 
         return RunRecord(**dict(row)) if row else None
 
+    async def list_runs(self, limit: int = 10) -> list[RunRecord]:
+        """Return recent runs ordered by last update."""
+
+        try:
+            async with aiosqlite.connect(self.db_path) as db:
+                db.row_factory = aiosqlite.Row
+                cursor = await db.execute(
+                    """
+                    SELECT * FROM runs
+                    ORDER BY updated_at DESC, created_at DESC, run_id DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                )
+                rows = await cursor.fetchall()
+        except aiosqlite.Error as exc:
+            raise PersistenceError(f"Failed to list runs: {exc}") from exc
+
+        return [RunRecord(**dict(row)) for row in rows]
+
     async def get_case_results(self, run_id: str) -> list[CaseResultRecord]:
         """Return stored case result records for a run."""
 
