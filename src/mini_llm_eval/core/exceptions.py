@@ -1,5 +1,7 @@
 """Project-specific exception types."""
 
+from __future__ import annotations
+
 
 class EvalRunnerException(Exception):
     """Base exception for the project."""
@@ -19,6 +21,20 @@ class ProviderInitError(EvalRunnerException):
 
 class ProviderError(EvalRunnerException):
     """Raised when provider invocation fails."""
+
+    def __init__(
+        self,
+        code: str,
+        *,
+        http_status: int | None = None,
+        request_id: str | None = None,
+        response_preview: str | None = None,
+    ) -> None:
+        super().__init__(code)
+        self.code = code
+        self.http_status = http_status
+        self.request_id = request_id
+        self.response_preview = response_preview
 
 
 class ProviderTimeoutError(ProviderError):

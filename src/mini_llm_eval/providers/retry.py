@@ -35,7 +35,7 @@ async def with_retry(
             return await func()
         except ProviderError as exc:
             attempt += 1
-            if exc.args and exc.args[0] not in RETRYABLE_ERROR_CODES:
+            if exc.code not in RETRYABLE_ERROR_CODES:
                 raise
             if attempt > max_retries:
                 logger.warning(
@@ -44,7 +44,7 @@ async def with_retry(
                         "event": "provider_retry_exhausted",
                         "provider_name": provider_name,
                         "attempt": attempt,
-                        "error_code": exc.args[0] if exc.args else None,
+                        "error_code": exc.code,
                     },
                 )
                 raise
@@ -56,7 +56,7 @@ async def with_retry(
                     "provider_name": provider_name,
                     "attempt": attempt,
                     "delay_seconds": delay,
-                    "error_code": exc.args[0] if exc.args else None,
+                    "error_code": exc.code,
                 },
             )
             await asyncio.sleep(delay)

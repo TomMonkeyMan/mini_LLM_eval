@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import random
 
 import httpx
@@ -228,6 +229,79 @@ async def test_openai_provider_returns_error_response_for_4xx() -> None:
 
     assert response.status is ProviderStatus.ERROR
     assert response.error == "bad_request"
+
+
+@pytest.mark.asyncio
+async def test_openai_provider_logs_structured_http_error_details(caplog) -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            403,
+            json={"error": {"message": "forbidden"}},
+            headers={"x-request-id": "req-403"},
+        )
+
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url="https://example.test",
+    )
+    provider = OpenAICompatibleProvider(
+        "remote",
+        ProviderConfig(
+            type="openai_compatible",
+            base_url="https://example.test",
+            model="demo-model",
+            max_retries=0,
+        ),
+        client=client,
+    )
+
+    with caplog.at_level(logging.WARNING):
+        response = await provider.generate("hello")
+    await provider.close()
+
+    assert response.status is ProviderStatus.ERROR
+    warning_record = next(record for record in caplog.records if record.event == "provider_error")
+    assert warning_record.error_code == "bad_request"
+    assert warning_record.http_status == 403
+    assert warning_record.request_id == "req-403"
+    assert warning_record.response_preview == '{"error":{"message":"forbidden"}}'
+
+
+@pytest.mark.asyncio
+async def test_openai_provider_logs_truncated_error_response_preview(caplog) -> None:
+    long_message = "x" * 600
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            500,
+            json={"error": {"message": long_message}},
+        )
+
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url="https://example.test",
+    )
+    provider = OpenAICompatibleProvider(
+        "remote",
+        ProviderConfig(
+            type="openai_compatible",
+            base_url="https://example.test",
+            model="demo-model",
+            max_retries=0,
+        ),
+        client=client,
+    )
+
+    with caplog.at_level(logging.WARNING):
+        response = await provider.generate("hello")
+    await provider.close()
+
+    assert response.status is ProviderStatus.ERROR
+    warning_record = next(record for record in caplog.records if record.event == "provider_error")
+    assert warning_record.error_code == "server_error"
+    assert warning_record.http_status == 500
+    assert warning_record.response_preview.endswith("...")
+    assert len(warning_record.response_preview) == 503
 
 
 @pytest.mark.asyncio

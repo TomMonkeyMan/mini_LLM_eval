@@ -16,6 +16,7 @@ from mini_llm_eval.providers.base import BaseProvider
 from mini_llm_eval.providers.retry import with_retry
 
 logger = get_logger(__name__)
+MAX_RESPONSE_PREVIEW_CHARS = 500
 
 
 class OpenAICompatibleProvider(BaseProvider):
@@ -125,30 +126,54 @@ class OpenAICompatibleProvider(BaseProvider):
                     "event": "provider_error",
                     "provider_name": self._name,
                     "model_name": self._config.model,
-                    "error_code": str(exc),
+                    "error_code": exc.code,
+                    "http_status": exc.http_status,
+                    "request_id": exc.request_id,
+                    "response_preview": exc.response_preview,
                 },
             )
             return ProviderResponse(
                 output="",
                 latency_ms=0,
                 status=ProviderStatus.ERROR,
-                error=str(exc),
+                error=exc.code,
                 model_name=self._config.model,
             )
 
     def _parse_response(self, response: httpx.Response, latency_ms: float) -> ProviderResponse:
+        request_id = response.headers.get("x-request-id")
         if response.status_code == 429:
-            raise ProviderError("rate_limit")
+            raise ProviderError(
+                "rate_limit",
+                http_status=response.status_code,
+                request_id=request_id,
+                response_preview=self._response_preview(response),
+            )
         if 500 <= response.status_code <= 599:
-            raise ProviderError("server_error")
+            raise ProviderError(
+                "server_error",
+                http_status=response.status_code,
+                request_id=request_id,
+                response_preview=self._response_preview(response),
+            )
         if response.status_code >= 400:
-            raise ProviderError("bad_request")
+            raise ProviderError(
+                "bad_request",
+                http_status=response.status_code,
+                request_id=request_id,
+                response_preview=self._response_preview(response),
+            )
 
         try:
             payload = response.json()
             message = payload["choices"][0]["message"]["content"]
         except (ValueError, KeyError, IndexError, TypeError) as exc:
-            raise ProviderError("invalid_response") from exc
+            raise ProviderError(
+                "invalid_response",
+                http_status=response.status_code,
+                request_id=request_id,
+                response_preview=self._response_preview(response),
+            ) from exc
 
         usage_payload = payload.get("usage")
         token_usage = None
@@ -166,8 +191,17 @@ class OpenAICompatibleProvider(BaseProvider):
             error=None,
             token_usage=token_usage,
             model_name=payload.get("model", self._config.model),
-            request_id=response.headers.get("x-request-id"),
+            request_id=request_id,
         )
+
+    @staticmethod
+    def _response_preview(response: httpx.Response) -> str | None:
+        body = response.text.strip()
+        if not body:
+            return None
+        if len(body) <= MAX_RESPONSE_PREVIEW_CHARS:
+            return body
+        return f"{body[:MAX_RESPONSE_PREVIEW_CHARS]}..."
 
     async def health_check(self) -> bool:
         try:

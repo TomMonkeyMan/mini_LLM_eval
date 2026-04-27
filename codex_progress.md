@@ -163,6 +163,13 @@
   - case change summary table
 - Updated `README.md` and `docs/9_v1_report.md` to reflect compare availability.
 - Current verified test count: `66` passing.
+- Improved provider failure observability without suppressing transport logs:
+  - upgraded `ProviderError` to carry structured context
+  - provider warning logs now include `http_status`, `request_id`, and truncated `response_preview`
+  - retry logic now reads structured `error_code` from the exception object instead of positional args
+- Added provider logging regression tests for:
+  - structured 4xx error details
+  - truncated large error responses
 - Added CLI tests covering:
   - listing recent runs
   - showing failed-only case results
