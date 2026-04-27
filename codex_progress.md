@@ -146,6 +146,23 @@
   - plugin provider invalid return shape
   - database save-case-result persistence wrapping
 - Current verified test count: `62` passing.
+- Started the compare layer as a separate analysis service:
+  - added `ComparisonError`
+  - added compare schemas in `models/schemas.py`
+  - added `services/comparator.py` for artifact-based run comparison
+  - compare currently works from `meta.json + case_results.jsonl`
+- Added compare tests covering:
+  - summary deltas
+  - newly failed / fixed case detection
+  - base-only / candidate-only case detection
+  - missing summary failure
+- Added CLI compare support:
+  - new `compare` command
+  - summary delta table
+  - tag pass-rate delta table
+  - case change summary table
+- Updated `README.md` and `docs/9_v1_report.md` to reflect compare availability.
+- Current verified test count: `66` passing.
 - Added CLI tests covering:
   - listing recent runs
   - showing failed-only case results

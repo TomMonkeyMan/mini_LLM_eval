@@ -29,6 +29,10 @@ class EvaluatorError(EvalRunnerException):
     """Raised when evaluator execution fails."""
 
 
+class ComparisonError(EvalRunnerException):
+    """Raised when run artifact comparison fails."""
+
+
 class PersistenceError(EvalRunnerException):
     """Raised when database or artifact persistence fails."""
 

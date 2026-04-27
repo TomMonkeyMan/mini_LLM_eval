@@ -125,3 +125,48 @@ class RunResult(BaseModel):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     summary: RunSummary | None = None
+
+
+class TagCompareResult(BaseModel):
+    tag: str
+    base_total: int
+    candidate_total: int
+    base_pass_rate: float
+    candidate_pass_rate: float
+    pass_rate_delta: float
+
+
+class CompareSummary(BaseModel):
+    base_pass_rate: float
+    candidate_pass_rate: float
+    pass_rate_delta: float
+    base_passed_cases: int
+    candidate_passed_cases: int
+    passed_delta: int
+    base_failed_cases: int
+    candidate_failed_cases: int
+    failed_delta: int
+    base_error_cases: int
+    candidate_error_cases: int
+    error_delta: int
+    base_avg_latency_ms: float
+    candidate_avg_latency_ms: float
+    avg_latency_delta_ms: float
+    base_p95_latency_ms: float
+    candidate_p95_latency_ms: float
+    p95_latency_delta_ms: float
+    shared_case_count: int
+    base_only_case_ids: list[str] = Field(default_factory=list)
+    candidate_only_case_ids: list[str] = Field(default_factory=list)
+    newly_failed_case_ids: list[str] = Field(default_factory=list)
+    fixed_case_ids: list[str] = Field(default_factory=list)
+    newly_errored_case_ids: list[str] = Field(default_factory=list)
+
+
+class CompareResult(BaseModel):
+    base_run_id: str
+    candidate_run_id: str
+    base_status: RunStatus
+    candidate_status: RunStatus
+    summary: CompareSummary
+    tag_results: dict[str, TagCompareResult] = Field(default_factory=dict)

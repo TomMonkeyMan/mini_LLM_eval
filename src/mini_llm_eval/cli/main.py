@@ -23,7 +23,8 @@ from mini_llm_eval.core.logging import get_logger, setup_logging
 from mini_llm_eval.core.types import CaseResultRecord, RunRecord
 from mini_llm_eval.db.database import Database
 from mini_llm_eval.db.file_storage import FileStorage
-from mini_llm_eval.models.schemas import RunConfig
+from mini_llm_eval.models.schemas import CompareResult, RunConfig
+from mini_llm_eval.services.comparator import Comparator
 from mini_llm_eval.services.run_service import RunService
 
 app = typer.Typer(help="Mini LLM evaluation runner CLI")
@@ -88,6 +89,12 @@ async def _cancel_and_load_record(service: RunService, db: Database, run_id: str
     if run_record is None:
         raise EvalRunnerException(f"Run cancelled but could not be loaded: {cancelled_run_id}")
     return run_record
+
+
+def _build_storage(config_path: str | None) -> tuple[Config, FileStorage]:
+    config = load_config(config_path)
+    setup_logging(config.log_level)
+    return config, FileStorage(output_dir=config.output_dir)
 
 
 def _print_run_summary(run_record: RunRecord) -> None:
@@ -170,6 +177,46 @@ def _print_case_results(case_rows: list[CaseResultRecord], failed_only: bool = F
         )
 
     console.print(table)
+
+
+def _print_compare_result(result: CompareResult) -> None:
+    summary_table = Table(title=f"Compare {result.base_run_id} -> {result.candidate_run_id}")
+    summary_table.add_column("Metric")
+    summary_table.add_column("Base")
+    summary_table.add_column("Candidate")
+    summary_table.add_column("Delta")
+    summary_table.add_row("Pass Rate", f"{result.summary.base_pass_rate:.2%}", f"{result.summary.candidate_pass_rate:.2%}", f"{result.summary.pass_rate_delta:+.2%}")
+    summary_table.add_row("Passed", str(result.summary.base_passed_cases), str(result.summary.candidate_passed_cases), f"{result.summary.passed_delta:+d}")
+    summary_table.add_row("Failed", str(result.summary.base_failed_cases), str(result.summary.candidate_failed_cases), f"{result.summary.failed_delta:+d}")
+    summary_table.add_row("Errors", str(result.summary.base_error_cases), str(result.summary.candidate_error_cases), f"{result.summary.error_delta:+d}")
+    summary_table.add_row("Avg Latency", f"{result.summary.base_avg_latency_ms:.2f} ms", f"{result.summary.candidate_avg_latency_ms:.2f} ms", f"{result.summary.avg_latency_delta_ms:+.2f} ms")
+    summary_table.add_row("P95 Latency", f"{result.summary.base_p95_latency_ms:.2f} ms", f"{result.summary.candidate_p95_latency_ms:.2f} ms", f"{result.summary.p95_latency_delta_ms:+.2f} ms")
+    console.print(summary_table)
+
+    if result.tag_results:
+        tag_table = Table(title="Tag Changes")
+        tag_table.add_column("Tag")
+        tag_table.add_column("Base")
+        tag_table.add_column("Candidate")
+        tag_table.add_column("Delta")
+        for tag_result in result.tag_results.values():
+            tag_table.add_row(
+                tag_result.tag,
+                f"{tag_result.base_pass_rate:.2%}",
+                f"{tag_result.candidate_pass_rate:.2%}",
+                f"{tag_result.pass_rate_delta:+.2%}",
+            )
+        console.print(tag_table)
+
+    case_table = Table(title="Case Changes")
+    case_table.add_column("Category")
+    case_table.add_column("Case IDs")
+    case_table.add_row("Newly Failed", ", ".join(result.summary.newly_failed_case_ids) or "-")
+    case_table.add_row("Fixed", ", ".join(result.summary.fixed_case_ids) or "-")
+    case_table.add_row("Newly Errored", ", ".join(result.summary.newly_errored_case_ids) or "-")
+    case_table.add_row("Base Only", ", ".join(result.summary.base_only_case_ids) or "-")
+    case_table.add_row("Candidate Only", ", ".join(result.summary.candidate_only_case_ids) or "-")
+    console.print(case_table)
 
 
 @app.command()
@@ -393,6 +440,36 @@ def cancel(
         raise typer.Exit(code=1)
     finally:
         reset_runtime_config()
+
+
+@app.command()
+def compare(
+    base: str = typer.Option(..., help="Base run id"),
+    candidate: str = typer.Option(..., help="Candidate run id"),
+    config: str | None = typer.Option(None, help="Path to config.yaml"),
+) -> None:
+    """Compare two runs from exported artifacts."""
+
+    try:
+        _, storage = _build_storage(config)
+        logger.info(
+            "CLI compare command started",
+            extra={"event": "cli_compare_started", "base_run_id": base, "candidate_run_id": candidate},
+        )
+        comparator = Comparator(storage)
+        result = comparator.compare_runs(base, candidate)
+        logger.info(
+            "CLI compare command completed",
+            extra={"event": "cli_compare_completed", "base_run_id": base, "candidate_run_id": candidate},
+        )
+        _print_compare_result(result)
+    except EvalRunnerException as exc:
+        logger.exception(
+            "CLI compare command failed",
+            extra={"event": "cli_compare_failed", "base_run_id": base, "candidate_run_id": candidate},
+        )
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(code=1)
 
 
 def main() -> None:

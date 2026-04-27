@@ -46,6 +46,7 @@
   - `list`
   - `show`
   - `cancel`
+  - `compare`
 
 ## 项目结构
 
@@ -245,6 +246,21 @@ mini-llm-eval cancel demo-run --config config.yaml --providers providers.yaml
 
 - 当前 v1 只可靠支持取消 `PENDING` run
 - 已经进入 `RUNNING` 的 run 暂不支持主动中断
+
+### 8. 对比两次 run
+
+```bash
+mini-llm-eval compare \
+  --base run-base \
+  --candidate run-candidate \
+  --config config.yaml
+```
+
+当前 compare 基于导出的 `meta.json + case_results.jsonl`，会输出：
+
+- summary 指标变化
+- tag 维度 pass rate 变化
+- newly failed / fixed / base-only / candidate-only case
 
 ## 输出结果
 

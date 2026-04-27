@@ -69,7 +69,7 @@
 
 结论：**v1 核心执行系统已完成，可进入实际使用、测试和后续迭代阶段。**
 
-但当前版本仍不是“完整平台版”，缺少 compare、API、报告生成等能力。
+但当前版本仍不是“完整平台版”，虽然已经有 compare 的基础分析层和 CLI 入口，仍缺少 API、报告生成等能力。
 
 ---
 
@@ -118,10 +118,10 @@
 
 | 模块 | 状态 | 说明 |
 |------|------|------|
-| 结果对比器 comparator | 未做 | compare 功能未实现 |
+| 结果对比器 comparator | 已完成 | 已基于 `meta.json + case_results.jsonl` 提供独立分析服务 |
 | FastAPI / HTTP API | 未做 | `api/` 目录和路由未实现 |
 | 报告生成器 reporter | 未做 | JSON/Markdown 报告服务未实现 |
-| CLI `compare` 命令 | 未做 | 未实现 |
+| CLI `compare` 命令 | 已完成 | 已支持基于导出产物进行对比 |
 | CLI `list` 命令 | 未做 | 未实现 |
 | CLI `show` 命令 | 未做 | 未实现 |
 | 进度条显示 | 未做 | CLI 暂无实时进度条 |
@@ -130,7 +130,7 @@
 | API 测试 | 未做 | 因 API 未实现 |
 | comparator 专项测试 | 未做 | 因 comparator 未实现 |
 | aggregator 独立测试 | 未做 | 聚合逻辑未拆分为独立服务 |
-| compare 示例输出 | 未做 | compare 功能未实现 |
+| compare 示例输出 | 部分完成 | 已有 CLI 表格输出，尚未形成独立对比报告文件 |
 
 ### 3.4 已被后续规格替代或延期
 
@@ -138,7 +138,7 @@
 
 | 项目 | 当前判断 | 原因 |
 |------|----------|------|
-| compare 功能 | 延后到后续版本 | 已在 v1 规格中明确排除 |
+| compare 功能 | 已作为独立分析层启动 | 当前未侵入 core 主流程，但后续仍可继续增强 |
 | FastAPI / API | 延后到后续版本 | 当前 v1 先以 CLI 为主 |
 | 分离式队列解耦流水线 | 延后到 v2 | 当前 v1 保持单 task 内 provider + evaluator |
 | 完整报告系统 | 延后到后续版本 | 当前先冻结结果产物结构 |
@@ -192,7 +192,7 @@
 - provider queue + evaluator queue + 多 stage worker
 - LLM Judge evaluator 并发池
 - API 层
-- compare / report
+- report
 
 这是符合当前产品节奏的，不属于缺陷。
 
@@ -222,7 +222,6 @@
 
 ### 5.3 P2：后续版本能力
 
-- compare 功能
 - FastAPI / HTTP API
 - 报告生成器
 - Provider/Evaluator 多 stage queue 架构
@@ -238,7 +237,7 @@
 1. 先把当前 v1 CLI 体验补齐
 2. 再补 run 查询与历史浏览能力
 3. 冻结产物格式和 meta 字段
-4. 之后再做 compare
+4. 继续打磨 compare 输出与报告层
 5. compare 稳定后再进入 API / v2 队列架构
 
 ---
