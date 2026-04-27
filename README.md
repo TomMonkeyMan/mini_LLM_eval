@@ -270,6 +270,45 @@ outputs/
     └── meta.json
 ```
 
+### Artifact Schema
+
+`case_results.jsonl` 的每一行当前固定包含：
+
+- `run_id`
+- `case_id`
+- `query`
+- `expected`
+- `actual_output`
+- `case_status`
+- `output_path`
+- `eval_results`
+- `latency_ms`
+- `provider_status`
+- `error_message`
+- `retries`
+- `created_at`
+
+`meta.json` 当前固定包含：
+
+- `run_id`
+- `dataset_path`
+- `provider_name`
+- `model_config`
+- `status`
+- `summary`
+- `created_at`
+- `started_at`
+- `finished_at`
+- `state_logs`
+- `case_result_count`
+
+兼容性约定：
+
+- 后续版本可以新增字段
+- 不应随意删除已有字段
+- 不应改变已有字段语义
+- 运行时以数据库为准，导出和离线分析以产物文件为稳定输入
+
 并且 SQLite 中会写入：
 
 - `runs`

@@ -10,7 +10,7 @@ from typing import Any
 from mini_llm_eval.core.config import Config, ProviderConfig, get_config, get_providers
 from mini_llm_eval.core.exceptions import DatasetLoadError, PersistenceError, ProviderInitError
 from mini_llm_eval.core.logging import get_logger
-from mini_llm_eval.core.types import RunMeta
+from mini_llm_eval.core.types import RunMeta, RunSummaryPayload
 from mini_llm_eval.db.database import Database
 from mini_llm_eval.db.file_storage import FileStorage
 from mini_llm_eval.evaluators import registry as evaluator_registry
@@ -305,7 +305,7 @@ class RunService:
         self,
         cases: list[EvalCase],
         results: list[CaseResult],
-    ) -> dict[str, Any]:
+    ) -> RunSummaryPayload:
         case_lookup = {case.case_id: case for case in cases}
         total_cases = len(cases)
         error_cases = 0

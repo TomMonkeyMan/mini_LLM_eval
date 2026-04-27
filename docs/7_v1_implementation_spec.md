@@ -669,11 +669,47 @@ v1 文件产物固定为：
 - 作为后续 compare 的稳定输入之一
 - 包含 case_id、provider 结果、eval 结果、错误信息等
 
+v1 中每一行至少固定包含以下字段：
+
+- `run_id`
+- `case_id`
+- `query`
+- `expected`
+- `actual_output`
+- `case_status`
+- `output_path`
+- `eval_results`
+- `latency_ms`
+- `provider_status`
+- `error_message`
+- `retries`
+- `created_at`
+
 `meta.json`
 
 - run 完成后从数据库导出的便携元数据快照
 - 用于归档、离线分析和后续 compare
 - 不是运行中的唯一真相来源
+
+v1 中 `meta.json` 至少固定包含以下字段：
+
+- `run_id`
+- `dataset_path`
+- `provider_name`
+- `model_config`
+- `status`
+- `summary`
+- `created_at`
+- `started_at`
+- `finished_at`
+- `state_logs`
+- `case_result_count`
+
+兼容性约束：
+
+- 后续版本可以新增字段
+- 不应随意删除上述字段
+- 不应改变上述字段语义
 
 ### 12.4 数据库仍是 meta 的权威来源
 

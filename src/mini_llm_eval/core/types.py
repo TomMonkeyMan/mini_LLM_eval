@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 
 class RunRecord(TypedDict):
@@ -47,6 +47,58 @@ class StateLogRecord(TypedDict):
     created_at: str
 
 
+class EvalResultPayload(TypedDict):
+    """Portable evaluator result payload stored in artifacts."""
+
+    passed: bool
+    reason: str
+    evaluator_type: str
+    details: NotRequired[dict[str, Any] | None]
+    error: NotRequired[str | None]
+
+
+class CaseResultArtifact(TypedDict):
+    """Single JSONL row written to case_results.jsonl."""
+
+    run_id: str
+    case_id: str
+    query: str
+    expected: str
+    actual_output: str
+    case_status: str
+    output_path: str | None
+    eval_results: dict[str, EvalResultPayload]
+    latency_ms: float
+    provider_status: str
+    error_message: str | None
+    retries: int
+    created_at: str
+
+
+class TagPassRatePayload(TypedDict):
+    """Portable tag-level pass-rate summary payload."""
+
+    total: int
+    passed: int
+    pass_rate: float
+
+
+class RunSummaryPayload(TypedDict):
+    """Portable run summary payload stored in DB and meta.json."""
+
+    total_cases: int
+    passed_cases: int
+    failed_cases: int
+    error_cases: int
+    pass_rate: float
+    tag_pass_rates: dict[str, TagPassRatePayload]
+    avg_latency_ms: float
+    p95_latency_ms: float
+    error_count: int
+    error_distribution: dict[str, int]
+    fatal_error: NotRequired[str]
+
+
 class RunMeta(TypedDict):
     """Artifact metadata written for a completed run."""
 
@@ -55,7 +107,7 @@ class RunMeta(TypedDict):
     provider_name: str
     model_config: dict[str, Any]
     status: str
-    summary: dict[str, Any] | None
+    summary: RunSummaryPayload | None
     created_at: str
     started_at: str | None
     finished_at: str | None

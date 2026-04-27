@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 
+import aiosqlite
 import pytest
 
+from mini_llm_eval.core.exceptions import PersistenceError
 from mini_llm_eval.db.database import Database
 from mini_llm_eval.db.file_storage import FileStorage
 from mini_llm_eval.models.schemas import (
@@ -96,13 +98,56 @@ def test_file_storage_writes_case_results_and_meta(tmp_path) -> None:
     )
 
     case_path = storage.append_case_result("run-1", result)
-    meta_path = storage.save_meta("run-1", {"run_id": "run-1", "status": "succeeded"})
+    meta_path = storage.save_meta(
+        "run-1",
+        {
+            "run_id": "run-1",
+            "dataset_path": "data/eval_cases.jsonl",
+            "provider_name": "mock-default",
+            "model_config": {},
+            "status": "succeeded",
+            "summary": None,
+            "created_at": "2026-04-27T00:00:00Z",
+            "started_at": "2026-04-27T00:00:01Z",
+            "finished_at": "2026-04-27T00:00:02Z",
+            "state_logs": [],
+            "case_result_count": 1,
+        },
+    )
 
     case_rows = storage.read_json_lines(case_path)
     meta = storage.read_json(meta_path)
 
     assert case_rows[0]["case_id"] == "case-1"
+    assert set(case_rows[0]) == {
+        "run_id",
+        "case_id",
+        "query",
+        "expected",
+        "actual_output",
+        "case_status",
+        "output_path",
+        "eval_results",
+        "latency_ms",
+        "provider_status",
+        "error_message",
+        "retries",
+        "created_at",
+    }
     assert meta["status"] == "succeeded"
+    assert set(meta) == {
+        "run_id",
+        "dataset_path",
+        "provider_name",
+        "model_config",
+        "status",
+        "summary",
+        "created_at",
+        "started_at",
+        "finished_at",
+        "state_logs",
+        "case_result_count",
+    }
 
 
 def test_file_storage_falls_back_when_output_dir_is_not_writable(tmp_path) -> None:
@@ -128,3 +173,31 @@ def test_file_storage_falls_back_when_output_dir_is_not_writable(tmp_path) -> No
 
     assert str(fallback_dir) in case_path
     assert str(fallback_dir) in meta_path
+
+
+@pytest.mark.asyncio
+async def test_database_save_case_result_wraps_sqlite_errors(tmp_path, monkeypatch) -> None:
+    db = Database(str(tmp_path / "eval.db"))
+    result = CaseResult(
+        run_id="run-1",
+        case_id="case-1",
+        query="hello",
+        expected="world",
+        actual_output="world",
+        case_status=CaseStatus.COMPLETED,
+        eval_results={},
+        latency_ms=1.0,
+        provider_status=ProviderStatus.SUCCESS,
+    )
+
+    class BrokenConnection:
+        async def __aenter__(self):
+            raise aiosqlite.Error("boom")
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(aiosqlite, "connect", lambda *args, **kwargs: BrokenConnection())
+
+    with pytest.raises(PersistenceError, match="Failed to save case result run-1/case-1: boom"):
+        await db.save_case_result(result)

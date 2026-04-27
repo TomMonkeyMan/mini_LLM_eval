@@ -131,6 +131,36 @@ def test_plugin_provider_rejects_non_async_generate(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_plugin_provider_rejects_missing_output_field(tmp_path) -> None:
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    plugin_path = plugins_dir / "bad_output.py"
+    plugin_path.write_text(
+        "\n".join(
+            [
+                "async def generate(query, config, **kwargs):",
+                '    return {"status": "success"}',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    provider = PluginProvider(
+        "custom-demo",
+        ProviderConfig.from_mapping(
+            {
+                "type": "plugin",
+                "plugin": "bad_output",
+                "plugins_dir": str(plugins_dir),
+            }
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="must return an 'output' field"):
+        await provider.generate("hello")
+
+
+@pytest.mark.asyncio
 async def test_openai_provider_parses_success_response(monkeypatch) -> None:
     monkeypatch.setenv("TEST_API_KEY", "secret")
 
@@ -198,6 +228,59 @@ async def test_openai_provider_returns_error_response_for_4xx() -> None:
 
     assert response.status is ProviderStatus.ERROR
     assert response.error == "bad_request"
+
+
+@pytest.mark.asyncio
+async def test_openai_provider_returns_timeout_response_for_timeout() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("timeout", request=request)
+
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url="https://example.test",
+    )
+    provider = OpenAICompatibleProvider(
+        "remote",
+        ProviderConfig(
+            type="openai_compatible",
+            base_url="https://example.test",
+            model="demo-model",
+        ),
+        client=client,
+    )
+
+    response = await provider.generate("hello")
+    await provider.close()
+
+    assert response.status is ProviderStatus.TIMEOUT
+    assert response.error == "Provider request timed out"
+
+
+@pytest.mark.asyncio
+async def test_openai_provider_returns_error_after_retry_budget_exhausted() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, json={"error": {"message": "server error"}})
+
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url="https://example.test",
+    )
+    provider = OpenAICompatibleProvider(
+        "remote",
+        ProviderConfig(
+            type="openai_compatible",
+            base_url="https://example.test",
+            model="demo-model",
+            max_retries=0,
+        ),
+        client=client,
+    )
+
+    response = await provider.generate("hello")
+    await provider.close()
+
+    assert response.status is ProviderStatus.ERROR
+    assert response.error == "server_error"
 
 
 def test_openai_provider_requires_base_url_and_model() -> None:

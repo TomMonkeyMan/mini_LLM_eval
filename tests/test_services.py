@@ -126,6 +126,18 @@ async def test_run_service_start_run_completes_and_writes_meta(tmp_path) -> None
     assert meta["status"] == RunStatus.SUCCEEDED.value
     assert len(case_rows) == 2
     assert meta["summary"]["passed_cases"] == 2
+    assert set(meta["summary"]) == {
+        "total_cases",
+        "passed_cases",
+        "failed_cases",
+        "error_cases",
+        "pass_rate",
+        "tag_pass_rates",
+        "avg_latency_ms",
+        "p95_latency_ms",
+        "error_count",
+        "error_distribution",
+    }
 
 
 @pytest.mark.asyncio

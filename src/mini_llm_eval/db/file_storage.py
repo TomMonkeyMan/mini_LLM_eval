@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
-from typing import Any
 
+from mini_llm_eval.core.types import CaseResultArtifact, RunMeta
 from mini_llm_eval.core.logging import get_logger
 from mini_llm_eval.models.schemas import CaseResult
 
@@ -52,7 +52,7 @@ class FileStorage:
             )
             return str(fallback_path)
 
-    def save_meta(self, run_id: str, meta: dict[str, Any]) -> str:
+    def save_meta(self, run_id: str, meta: RunMeta) -> str:
         """Write run metadata snapshot to meta.json."""
 
         target_path = self._run_dir(run_id) / "meta.json"
@@ -76,19 +76,19 @@ class FileStorage:
             )
             return str(fallback_path)
 
-    def read_json_lines(self, path: str) -> list[dict[str, Any]]:
+    def read_json_lines(self, path: str) -> list[CaseResultArtifact]:
         """Read a JSONL artifact back into memory."""
 
         file_path = Path(path)
         with file_path.open("r", encoding="utf-8") as handle:
-            return [json.loads(line) for line in handle if line.strip()]
+            return [CaseResultArtifact(**json.loads(line)) for line in handle if line.strip()]
 
-    def read_json(self, path: str) -> dict[str, Any]:
+    def read_json(self, path: str) -> RunMeta:
         """Read a JSON artifact back into memory."""
 
         file_path = Path(path)
         with file_path.open("r", encoding="utf-8") as handle:
-            return json.load(handle)
+            return RunMeta(**json.load(handle))
 
     def _fallback_path(self, run_id: str, stem: str, suffix: str) -> Path:
         run_dir = self.fallback_dir / run_id

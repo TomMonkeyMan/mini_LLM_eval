@@ -135,6 +135,17 @@
   - separate cancel request from final cancelled state
   - propose DB-level cancel request fields
   - propose executor cancel monitoring and task cancellation flow
+- Froze the current artifact contract for v1 output files:
+  - added explicit typed payloads for `case_results.jsonl`
+  - added explicit typed payloads for `meta.json` and run summary
+  - documented stable artifact fields in `README.md` and `docs/7_v1_implementation_spec.md`
+- Added artifact schema regression checks to ensure field stability.
+- Added provider / persistence exception-path coverage for:
+  - OpenAI-compatible timeout handling
+  - OpenAI-compatible retry exhaustion on 5xx
+  - plugin provider invalid return shape
+  - database save-case-result persistence wrapping
+- Current verified test count: `62` passing.
 - Added CLI tests covering:
   - listing recent runs
   - showing failed-only case results
