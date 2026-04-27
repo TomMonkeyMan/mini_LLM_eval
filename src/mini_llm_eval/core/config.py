@@ -56,6 +56,7 @@ class ProviderConfig(BaseModel):
     timeout_ms: int | None = None
     max_retries: int | None = None
     provider_concurrency_limit: int | None = None
+    requests_per_second: float | None = None
     mode: str | None = None
     mapping_file: str | None = None
     extra: dict[str, Any] = Field(default_factory=dict)

@@ -187,6 +187,15 @@
   - consolidated project examples under `demo/`
   - new `demo/` walkthrough with quickstart, sample dataset, two run artifacts, and compare example
   - updated README to point to the demo entry
+- Added a minimal provider-level throttling framework:
+  - new `RateLimitedProvider` wrapper
+  - supports `provider_concurrency_limit`
+  - supports `requests_per_second`
+  - wired through provider factory without changing the executor contract
+  - added config/provider regression tests plus service/CLI verification
+- Expanded `docs/12_raw_requirement_gap_report.md` with an explicit robustness checklist:
+  - mapped the 7 raw-requirement exception classes to current behavior
+  - documented the distinction between case-level isolation and run-level fatal persistence failures
 - Added CLI tests covering:
   - listing recent runs
   - showing failed-only case results

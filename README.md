@@ -116,7 +116,7 @@ defaults:
 
 - `timeout_ms`: Provider 调用超时
 - `max_retries`: Provider 重试次数
-- `concurrency`: 默认 Provider 并发数
+- `concurrency`: run 内默认 case 并发数，也是默认的 Provider in-flight 上限
 - `log_level`: 运行时日志级别，支持标准 Python logging level
 - `output_dir`: 输出目录
 - `evaluators_package`: Evaluator 自动发现包路径
@@ -383,7 +383,24 @@ my-vllm:
   base_url: ${MY_VLLM_BASE_URL}
   model: my-model
   api_key_env: MY_VLLM_API_KEY
+  provider_concurrency_limit: 4
+  requests_per_second: 2.0
 ```
+
+限流相关字段：
+
+- `provider_concurrency_limit`
+  - Provider 自身允许的最大并发请求数
+  - 适合限制单个远程模型服务的 in-flight requests
+- `requests_per_second`
+  - Provider 请求启动速率上限
+  - 适合对接有明确 RPS 配额的服务
+
+语义说明：
+
+- `concurrency` 控制 run 级并发
+- `provider_concurrency_limit` 控制单个 provider 的并发上限
+- `requests_per_second` 控制请求发出的节奏
 
 ### 3. Plugin Provider
 
@@ -426,6 +443,8 @@ async def generate(query: str, config: dict, **kwargs) -> dict:
 - 文件位于 `plugins_dir`
 - 模块中必须有 `async def generate(...)`
 - 返回值必须至少包含 `output`
+- 只要 provider 是通过项目的 factory 创建，plugin provider 也会自动继承统一的 provider wrapper
+- 这意味着 `provider_concurrency_limit` / `requests_per_second` 对 plugin provider 同样生效
 
 可选返回字段：
 
@@ -513,6 +532,7 @@ mini-llm-eval compare demo/sample_runs/run-baseline demo/sample_runs/run-candida
 - 不包含 LLM Judge
 - SQLite 仍是单机版本
 - Provider 自定义目前是“plugin 文件”级别，不是完整插件市场
+- 当前 provider 限流是基础版本，不包含自适应退让、429 驱动动态调参或分布式共享限流
 
 ## AI 工具使用说明
 

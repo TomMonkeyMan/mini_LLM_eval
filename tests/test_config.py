@@ -77,6 +77,29 @@ def test_load_providers_preserves_extra_fields(tmp_path, monkeypatch) -> None:
     assert provider.extra["custom_header"] == "x-tenant-id"
 
 
+def test_load_providers_parses_rate_limit_fields(tmp_path) -> None:
+    providers_path = tmp_path / "providers.yaml"
+    providers_path.write_text(
+        textwrap.dedent(
+            """
+            remote-model:
+              type: openai_compatible
+              base_url: https://example.test/v1
+              model: ft-model
+              provider_concurrency_limit: 2
+              requests_per_second: 1.5
+            """
+        ).strip(),
+        encoding="utf-8",
+    )
+
+    providers = load_providers(providers_path=str(providers_path))
+
+    provider = providers["remote-model"]
+    assert provider.provider_concurrency_limit == 2
+    assert provider.requests_per_second == 1.5
+
+
 def test_missing_environment_variable_raises_config_error(tmp_path) -> None:
     config_path = tmp_path / "config.yaml"
     config_path.write_text("output_dir: ${MISSING_ENV}\n", encoding="utf-8")

@@ -16,6 +16,7 @@ from mini_llm_eval.providers.factory import create_provider
 from mini_llm_eval.providers.mock import MockProvider
 from mini_llm_eval.providers.openai_compatible import OpenAICompatibleProvider
 from mini_llm_eval.providers.plugin import PluginProvider
+from mini_llm_eval.providers.rate_limited import ProviderRateLimiter, RateLimitedProvider
 from mini_llm_eval.providers.retry import with_retry
 
 
@@ -65,6 +66,77 @@ def test_factory_creates_known_provider_types() -> None:
     provider = create_provider("mock-default", ProviderConfig(type="mock"))
 
     assert provider.name == "mock-default"
+
+
+def test_factory_wraps_provider_when_rate_limit_is_configured() -> None:
+    provider = create_provider(
+        "mock-default",
+        ProviderConfig(
+            type="mock",
+            provider_concurrency_limit=2,
+            requests_per_second=1.0,
+        ),
+    )
+
+    assert isinstance(provider, RateLimitedProvider)
+
+
+@pytest.mark.asyncio
+async def test_rate_limited_provider_enforces_provider_concurrency_limit() -> None:
+    import asyncio
+
+    class TrackingProvider(MockProvider):
+        def __init__(self) -> None:
+            super().__init__("mock-default", ProviderConfig(type="mock"), rng=random.Random(0))
+            self.in_flight = 0
+            self.max_in_flight = 0
+
+        async def generate(self, query: str, **kwargs):
+            self.in_flight += 1
+            self.max_in_flight = max(self.max_in_flight, self.in_flight)
+            try:
+                await asyncio.sleep(0.01)
+                return await super().generate(query, **kwargs)
+            finally:
+                self.in_flight -= 1
+
+    provider = TrackingProvider()
+    wrapped = RateLimitedProvider(provider, provider_concurrency_limit=2)
+
+    await asyncio.gather(*(wrapped.generate(f"q-{idx}") for idx in range(6)))
+
+    assert provider.max_in_flight == 2
+
+
+@pytest.mark.asyncio
+async def test_provider_rate_limiter_spaces_requests_without_real_sleep() -> None:
+    class FakeClock:
+        def __init__(self) -> None:
+            self.now = 0.0
+            self.sleeps: list[float] = []
+
+        def monotonic(self) -> float:
+            return self.now
+
+        async def sleep(self, seconds: float) -> None:
+            self.sleeps.append(seconds)
+            self.now += seconds
+
+    fake_clock = FakeClock()
+    limiter = ProviderRateLimiter(
+        2.0,
+        monotonic=fake_clock.monotonic,
+        sleeper=fake_clock.sleep,
+    )
+
+    first_wait = await limiter.acquire()
+    second_wait = await limiter.acquire()
+    third_wait = await limiter.acquire()
+
+    assert first_wait == 0.0
+    assert second_wait == 0.5
+    assert third_wait == 0.5
+    assert fake_clock.sleeps == [0.5, 0.5]
 
 
 @pytest.mark.asyncio

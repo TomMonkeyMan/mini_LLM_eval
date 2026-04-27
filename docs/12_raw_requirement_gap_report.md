@@ -27,7 +27,7 @@
 
 1. 还没有独立报告生成器
 2. `RUNNING` run 主动取消尚未实现
-3. provider 级限流尚未实现
+3. provider 级限流仍只有基础版本
 
 ---
 
@@ -78,7 +78,7 @@
 | 完整报告生成器 | 未做 | 当前没有独立 Markdown / HTML report service |
 | HTTP API | 未做 | 但 raw requirement 允许 CLI / HTTP API 二选一，因此不影响最低验收 |
 | `RUNNING` run 主动取消 | 未做 | 当前仅可靠支持 `PENDING -> CANCELLED` |
-| provider 级限流 | 未做 | 当前有并发，但没有独立 rate limit / provider semaphore 语义 |
+| provider 级限流 | 部分满足 | 已支持 `provider_concurrency_limit` 和 `requests_per_second`，但还不是自适应/分布式版本 |
 
 ---
 
@@ -111,13 +111,19 @@
 
 - `RUNNING -> CANCELLED` 的真实中断执行路径
 
-### 3.3 provider 级限流尚未实现
+### 3.3 provider 级限流仍是基础版本
 
-当前已有 case 并发执行，但没有进一步实现：
+当前已实现：
 
-- provider semaphore
-- QPS / RPS 限流
+- `provider_concurrency_limit`
+- `requests_per_second`
+
+但还没有进一步实现：
+
 - 更明确的 provider-level concurrency cap
+- 429 驱动的自适应退让
+- 多进程 / 多 worker 共享限流
+- 更细粒度的突发流量控制
 
 ---
 
@@ -137,7 +143,30 @@
 
 ---
 
-## 5. 当前验收判断
+## 5. 鲁棒性条款对照
+
+`raw_requirement.txt` 要求“至少处理 4 类异常”，当前项目对所列 7 类异常的覆盖如下：
+
+| 异常类型 | 当前状态 | 说明 |
+|------|----------|------|
+| 非法输入数据 | 已满足 | 数据集文件不存在、格式非法、字段缺失、空数据集等都会被显式拒绝 |
+| provider 调用失败 | 已满足 | 单 case 会转为错误结果，不会直接打挂整批 run |
+| provider 超时 | 已满足 | provider 层和 executor 层均有 timeout 保护 |
+| evaluator 异常 | 已满足 | evaluator 异常会被捕获并写入结构化结果 |
+| 单个 case 重试失败 | 已满足 | retry budget 耗尽后落为 case error，而非 run fatal |
+| 并发执行中的部分失败 | 已满足 | 单 case task 错误隔离，其余 case 继续执行 |
+| 结果文件写入失败 | 部分满足 | 主输出目录不可写时支持 fallback；但数据库级持久化 fatal 仍会导致 run 失败 |
+
+结论：
+
+- 已覆盖 7 类中的至少 6 类
+- 明显超过 raw requirement 的“至少 4 类”门槛
+- “程序不能因为单条 case 失败而整体不可用”这一点对 provider/evaluator/case 级失败是满足的
+- 系统级持久化失败当前仍按 run 级 fatal error 处理，这属于当前实现的明确边界
+
+---
+
+## 6. 当前验收判断
 
 在本轮补齐后，项目对 `raw_requirement.txt` 的状态可以表述为：
 
@@ -149,5 +178,5 @@
 
 - 独立报告导出器
 - `RUNNING` run cancel
-- provider 级限流
+- 更完整的 provider 级限流
 - HTTP API
