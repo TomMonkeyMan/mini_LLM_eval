@@ -196,6 +196,16 @@
 - Expanded `docs/12_raw_requirement_gap_report.md` with an explicit robustness checklist:
   - mapped the 7 raw-requirement exception classes to current behavior
   - documented the distinction between case-level isolation and run-level fatal persistence failures
+- Added an artifact-driven report layer:
+  - new `Reporter` service for Markdown / HTML rendering
+  - supports single-run reports and compare reports
+  - added `report-run` and `report-compare` CLI commands
+  - added reporter and CLI regression tests
+  - updated README and gap-report wording to reflect basic report-export support
+- Updated `demo/` to cover the report layer:
+  - added generated sample Markdown reports under `demo/reports/`
+  - updated `demo/README.md` and `demo/compare_example.md` with report-export examples
+  - updated top-level README demo links to include report artifacts
 - Added CLI tests covering:
   - listing recent runs
   - showing failed-only case results

@@ -25,13 +25,13 @@
   - `plugin`
 - Evaluator
   - `exact_match`
-- `contains`
-- `contains_all`
-- `regex`
-- `json_field`
-- `length_range`
-- `not_contains`
-- `numeric_tolerance`
+  - `contains`
+  - `contains_all`
+  - `regex`
+  - `json_field`
+  - `length_range`
+  - `not_contains`
+  - `numeric_tolerance`
 - 执行模型
   - Provider 并发执行
   - Evaluator 内联执行
@@ -47,6 +47,8 @@
   - `show`
   - `cancel`
   - `compare`
+  - `report-run`
+  - `report-compare`
 
 ## 项目结构
 
@@ -267,6 +269,27 @@ mini-llm-eval compare ./outputs/run-base ./outputs/run-candidate
 - tag 维度 pass rate 变化
 - newly failed / fixed / base-only / candidate-only case
 
+### 9. 导出单次 run 报告
+
+```bash
+mini-llm-eval report-run demo-run --output-dir ./outputs --format markdown
+mini-llm-eval report-run demo-run --output-dir ./outputs --format html --output ./reports/demo-run.html
+```
+
+### 10. 导出 compare 报告
+
+```bash
+mini-llm-eval report-compare run-base run-candidate --output-dir ./outputs --format markdown
+mini-llm-eval report-compare run-base run-candidate --output-dir ./outputs --format html --output ./reports/compare.html
+```
+
+说明：
+
+- `report-run` 和 `report-compare` 属于 artifact 渲染层
+- 它们不参与执行流程，只读取已有产物
+- 支持 `markdown` 和 `html`
+- 可以输出到 stdout，也可以通过 `--output` 写入文件
+
 ## 输出结果
 
 默认输出到 `output_dir`。
@@ -290,6 +313,8 @@ outputs/
     ├── case_results.jsonl
     └── meta.json
 ```
+
+现阶段报告导出也是基于这些 artifact 完成的。
 
 ### Artifact Schema
 
@@ -516,6 +541,8 @@ python -m pytest
 - [demo/quickstart/README.md](/Users/tiashi/Desktop/mini_LLM_eval/demo/quickstart/README.md)
 - [demo/sample_runs/run-baseline/meta.json](/Users/tiashi/Desktop/mini_LLM_eval/demo/sample_runs/run-baseline/meta.json)
 - [demo/sample_runs/run-candidate/meta.json](/Users/tiashi/Desktop/mini_LLM_eval/demo/sample_runs/run-candidate/meta.json)
+- [demo/reports/run-baseline.md](/Users/tiashi/Desktop/mini_LLM_eval/demo/reports/run-baseline.md)
+- [demo/reports/compare-baseline-vs-candidate.md](/Users/tiashi/Desktop/mini_LLM_eval/demo/reports/compare-baseline-vs-candidate.md)
 
 可以直接运行：
 
@@ -533,6 +560,7 @@ mini-llm-eval compare demo/sample_runs/run-baseline demo/sample_runs/run-candida
 - SQLite 仍是单机版本
 - Provider 自定义目前是“plugin 文件”级别，不是完整插件市场
 - 当前 provider 限流是基础版本，不包含自适应退让、429 驱动动态调参或分布式共享限流
+- 当前 HTML 报告是基础静态模板，不包含交互式图表或复杂样式系统
 
 ## AI 工具使用说明
 

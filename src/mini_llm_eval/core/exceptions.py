@@ -49,6 +49,10 @@ class ComparisonError(EvalRunnerException):
     """Raised when run artifact comparison fails."""
 
 
+class ReportError(EvalRunnerException):
+    """Raised when report rendering or export fails."""
+
+
 class PersistenceError(EvalRunnerException):
     """Raised when database or artifact persistence fails."""
 

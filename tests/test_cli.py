@@ -506,3 +506,134 @@ def test_cli_compare_command_accepts_explicit_run_directories(tmp_path) -> None:
 
     assert compare_result.exit_code == 0, compare_result.stdout
     assert "Compare run-base -> run-candidate" in compare_result.stdout
+
+
+def test_cli_report_run_command_outputs_markdown(tmp_path) -> None:
+    config_path, providers_path, dataset_path, db_path = _write_basic_config(tmp_path)
+
+    run_result = runner.invoke(
+        app,
+        [
+            "run",
+            "--dataset",
+            str(dataset_path),
+            "--provider",
+            "mock-default",
+            "--run-id",
+            "run-report",
+            "--config",
+            str(config_path),
+            "--providers",
+            str(providers_path),
+            "--db-path",
+            str(db_path),
+        ],
+    )
+    assert run_result.exit_code == 0, run_result.stdout
+
+    report_result = runner.invoke(
+        app,
+        [
+            "report-run",
+            "run-report",
+            "--output-dir",
+            str(tmp_path / "outputs"),
+            "--format",
+            "markdown",
+        ],
+    )
+
+    assert report_result.exit_code == 0, report_result.stdout
+    assert "# Run Report: run-report" in report_result.stdout
+    assert "## Summary" in report_result.stdout
+
+
+def test_cli_report_compare_command_writes_html_file(tmp_path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "timeout_ms: 5000",
+                "max_retries: 3",
+                "concurrency: 2",
+                f'output_dir: "{tmp_path / "outputs"}"',
+                'evaluators_package: "mini_llm_eval.evaluators"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+    base_mapping_path = tmp_path / "base_mapping.json"
+    base_mapping_path.write_text(json.dumps({"Question A": "expected-a"}), encoding="utf-8")
+    candidate_mapping_path = tmp_path / "candidate_mapping.json"
+    candidate_mapping_path.write_text(json.dumps({"Question A": "wrong-answer"}), encoding="utf-8")
+    providers_path = tmp_path / "providers.yaml"
+    providers_path.write_text(
+        "\n".join(
+            [
+                "mock-base:",
+                "  type: mock",
+                f'  mapping_file: "{base_mapping_path}"',
+                "mock-candidate:",
+                "  type: mock",
+                f'  mapping_file: "{candidate_mapping_path}"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+    dataset_path = tmp_path / "dataset.jsonl"
+    dataset_path.write_text(
+        json.dumps(
+            {
+                "case_id": "case-a",
+                "query": "Question A",
+                "expected_answer": "expected-a",
+                "eval_type": "contains",
+                "tags": ["knowledge"],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    db_path = tmp_path / "cli.db"
+
+    for run_id, provider_name in (("run-base", "mock-base"), ("run-candidate", "mock-candidate")):
+        run_result = runner.invoke(
+            app,
+            [
+                "run",
+                "--dataset",
+                str(dataset_path),
+                "--provider",
+                provider_name,
+                "--run-id",
+                run_id,
+                "--config",
+                str(config_path),
+                "--providers",
+                str(providers_path),
+                "--db-path",
+                str(db_path),
+            ],
+        )
+        assert run_result.exit_code == 0, run_result.stdout
+
+    output_path = tmp_path / "compare_report.html"
+    report_result = runner.invoke(
+        app,
+        [
+            "report-compare",
+            "run-base",
+            "run-candidate",
+            "--output-dir",
+            str(tmp_path / "outputs"),
+            "--format",
+            "html",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert report_result.exit_code == 0, report_result.stdout
+    html = output_path.read_text(encoding="utf-8")
+    assert "<!DOCTYPE html>" in html
+    assert "Compare Report: run-base -&gt; run-candidate" in html

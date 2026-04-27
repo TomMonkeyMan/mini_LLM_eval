@@ -6,6 +6,13 @@
 mini-llm-eval compare demo/sample_runs/run-baseline demo/sample_runs/run-candidate
 ```
 
+如果想导出成报告：
+
+```bash
+mini-llm-eval report-compare demo/sample_runs/run-baseline demo/sample_runs/run-candidate --format markdown
+mini-llm-eval report-compare demo/sample_runs/run-baseline demo/sample_runs/run-candidate --format html --output ./compare.html
+```
+
 ## Expected Takeaways
 
 - 总通过率保持 `75% -> 75%`

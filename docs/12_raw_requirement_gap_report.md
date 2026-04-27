@@ -25,9 +25,9 @@
 
 在补充 demo artifact 和 gap report 之后，当前最主要的剩余 gap 已不在执行主干，而在增强能力：
 
-1. 还没有独立报告生成器
-2. `RUNNING` run 主动取消尚未实现
-3. provider 级限流仍只有基础版本
+1. `RUNNING` run 主动取消尚未实现
+2. provider 级限流仍只有基础版本
+3. 报告层仍是基础静态导出版本
 
 ---
 
@@ -67,7 +67,7 @@
 
 | 要求 | 当前状态 | 说明 |
 |------|----------|------|
-| 聚合指标并生成报告 | 部分满足 | 当前已有 `meta.json`、`case_results.jsonl`、CLI compare 输出和 demo，但没有独立 report exporter |
+| 聚合指标并生成报告 | 已满足 | 已支持 artifact 驱动的 Markdown / HTML 报告导出 |
 
 ### 2.3 尚未满足或明确未做
 
@@ -75,7 +75,7 @@
 
 | 项目 | 当前状态 | 说明 |
 |------|----------|------|
-| 完整报告生成器 | 未做 | 当前没有独立 Markdown / HTML report service |
+| 高级报告展示能力 | 部分满足 | 已有 Markdown / HTML report service，但仍缺少图表、交互和更复杂模板 |
 | HTTP API | 未做 | 但 raw requirement 允许 CLI / HTTP API 二选一，因此不影响最低验收 |
 | `RUNNING` run 主动取消 | 未做 | 当前仅可靠支持 `PENDING -> CANCELLED` |
 | provider 级限流 | 部分满足 | 已支持 `provider_concurrency_limit` 和 `requests_per_second`，但还不是自适应/分布式版本 |
@@ -86,20 +86,23 @@
 
 从“项目能不能用”角度看，核心执行已经可用；从“按题目交付是否完整”角度看，本轮补齐后剩余的 gap 主要是增强项。
 
-### 3.1 独立报告生成器仍未实现
+### 3.1 报告层仍是基础静态导出版本
 
 当前项目已经有：
 
 - `meta.json`
 - `case_results.jsonl`
 - CLI summary / compare 表格输出
+- `report-run`
+- `report-compare`
+- Markdown / HTML 导出
 - `demo/` 中的样例产物
 
-但如果严格按“生成报告”理解，仍缺少单独的：
+但目前仍缺少更完整的展示层能力，例如：
 
-- Markdown report exporter
-- HTML report exporter
-- 独立 report service
+- 交互式图表
+- 可视化 dashboard
+- 更丰富的 HTML 模板系统
 
 ### 3.2 `RUNNING` cancel 仍然只是设计完成
 
@@ -176,7 +179,7 @@
 
 仍可继续增强但不再构成主要 gap 的内容包括：
 
-- 独立报告导出器
 - `RUNNING` run cancel
 - 更完整的 provider 级限流
+- 更丰富的报告展示层
 - HTTP API

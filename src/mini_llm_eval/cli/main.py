@@ -19,12 +19,14 @@ from mini_llm_eval.core.config import (
     set_runtime_config,
 )
 from mini_llm_eval.core.exceptions import EvalRunnerException
+from mini_llm_eval.core.exceptions import ReportError
 from mini_llm_eval.core.logging import get_logger, setup_logging
 from mini_llm_eval.core.types import CaseResultRecord, RunRecord
 from mini_llm_eval.db.database import Database
 from mini_llm_eval.db.file_storage import FileStorage
 from mini_llm_eval.models.schemas import CompareResult, RunConfig
 from mini_llm_eval.services.comparator import Comparator
+from mini_llm_eval.services.reporter import Reporter
 from mini_llm_eval.services.run_service import RunService
 
 app = typer.Typer(help="Mini LLM evaluation runner CLI")
@@ -102,6 +104,18 @@ def _resolve_compare_input(value: str, output_dir: str) -> tuple[str, str]:
     if "/" in value or value.startswith(".") or value.startswith("~"):
         return str(input_path), str(input_path)
     return value, str(Path(output_dir) / value)
+
+
+def _write_report_output(report: str, output_path: str | None) -> None:
+    if output_path is None:
+        typer.echo(report)
+        return
+    target = Path(output_path)
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(report, encoding="utf-8")
+    except OSError as exc:
+        raise ReportError(f"Failed to write report output {target}: {exc}") from exc
 
 
 def _print_run_summary(run_record: RunRecord) -> None:
@@ -491,6 +505,90 @@ def compare(
                 "base_input": base,
                 "candidate_input": candidate,
             },
+        )
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@app.command("report-run")
+def report_run(
+    target: str = typer.Argument(..., help="Run id or run artifact directory"),
+    output_dir: str = typer.Option("./outputs", help="Directory containing run artifact folders"),
+    format: str = typer.Option("markdown", help="Report format: markdown or html"),
+    output: str | None = typer.Option(None, help="Write report to a file instead of stdout"),
+) -> None:
+    """Render a single-run report from artifacts."""
+
+    try:
+        setup_logging("INFO")
+        storage = FileStorage(output_dir=output_dir)
+        reporter = Reporter(storage)
+        target_label, target_path = _resolve_compare_input(target, output_dir)
+        logger.info(
+            "CLI report-run command started",
+            extra={"event": "cli_report_run_started", "target": target, "target_path": target_path, "format": format},
+        )
+        meta, case_results = reporter.load_run_artifacts(target_path)
+        report = reporter.render_run_report(meta, case_results, format=format)
+        _write_report_output(report, output)
+        logger.info(
+            "CLI report-run command completed",
+            extra={"event": "cli_report_run_completed", "run_id": target_label, "format": format, "output": output},
+        )
+    except EvalRunnerException as exc:
+        logger.exception(
+            "CLI report-run command failed",
+            extra={"event": "cli_report_run_failed", "target": target, "format": format},
+        )
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@app.command("report-compare")
+def report_compare(
+    base: str = typer.Argument(..., help="Base run id or run artifact directory"),
+    candidate: str = typer.Argument(..., help="Candidate run id or run artifact directory"),
+    output_dir: str = typer.Option("./outputs", help="Directory containing run artifact folders"),
+    format: str = typer.Option("markdown", help="Report format: markdown or html"),
+    output: str | None = typer.Option(None, help="Write report to a file instead of stdout"),
+) -> None:
+    """Render a compare report from artifacts."""
+
+    try:
+        setup_logging("INFO")
+        storage = FileStorage(output_dir=output_dir)
+        base_label, base_path = _resolve_compare_input(base, output_dir)
+        candidate_label, candidate_path = _resolve_compare_input(candidate, output_dir)
+        logger.info(
+            "CLI report-compare command started",
+            extra={
+                "event": "cli_report_compare_started",
+                "base_input": base,
+                "candidate_input": candidate,
+                "base_path": base_path,
+                "candidate_path": candidate_path,
+                "format": format,
+            },
+        )
+        comparator = Comparator(storage)
+        reporter = Reporter(storage)
+        result = comparator.compare_run_dirs(base_path, candidate_path)
+        report = reporter.render_compare_report(result, format=format)
+        _write_report_output(report, output)
+        logger.info(
+            "CLI report-compare command completed",
+            extra={
+                "event": "cli_report_compare_completed",
+                "base_run_id": base_label,
+                "candidate_run_id": candidate_label,
+                "format": format,
+                "output": output,
+            },
+        )
+    except EvalRunnerException as exc:
+        logger.exception(
+            "CLI report-compare command failed",
+            extra={"event": "cli_report_compare_failed", "base_input": base, "candidate_input": candidate, "format": format},
         )
         console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(code=1)

@@ -10,6 +10,9 @@
 - `sample_runs/`
   - 两份固定 artifact
   - 用来直接演示 compare 能力
+- `reports/`
+  - 基于 demo artifact 导出的样例 Markdown 报告
+  - 用来展示报告层输出长什么样
 
 ## 目录说明
 
@@ -25,6 +28,9 @@ demo/
 │   ├── data/
 │   ├── plugins/
 │   └── outputs/
+├── reports/
+│   ├── run-baseline.md
+│   └── compare-baseline-vs-candidate.md
 └── sample_runs/
     ├── run-baseline/
     │   ├── case_results.jsonl
@@ -54,6 +60,8 @@ demo/
 - [sample_runs/run-baseline/meta.json](/Users/tiashi/Desktop/mini_LLM_eval/demo/sample_runs/run-baseline/meta.json)
 - [sample_runs/run-candidate/meta.json](/Users/tiashi/Desktop/mini_LLM_eval/demo/sample_runs/run-candidate/meta.json)
 - [compare_example.md](/Users/tiashi/Desktop/mini_LLM_eval/demo/compare_example.md)
+- [reports/run-baseline.md](/Users/tiashi/Desktop/mini_LLM_eval/demo/reports/run-baseline.md)
+- [reports/compare-baseline-vs-candidate.md](/Users/tiashi/Desktop/mini_LLM_eval/demo/reports/compare-baseline-vs-candidate.md)
 
 这两份 run 的设计是：
 
@@ -80,4 +88,18 @@ mini-llm-eval compare demo/sample_runs/run-baseline demo/sample_runs/run-candida
 
 ```bash
 mini-llm-eval compare run-baseline run-candidate --output-dir demo/sample_runs
+```
+
+## 3. 报告样例
+
+如果你想直接看报告层输出，而不是自己手动生成，可以看：
+
+- [reports/run-baseline.md](/Users/tiashi/Desktop/mini_LLM_eval/demo/reports/run-baseline.md)
+- [reports/compare-baseline-vs-candidate.md](/Users/tiashi/Desktop/mini_LLM_eval/demo/reports/compare-baseline-vs-candidate.md)
+
+也可以自己重新导出：
+
+```bash
+mini-llm-eval report-run demo/sample_runs/run-baseline --format markdown
+mini-llm-eval report-compare demo/sample_runs/run-baseline demo/sample_runs/run-candidate --format markdown
 ```
