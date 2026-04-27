@@ -97,6 +97,13 @@ def _build_storage(config_path: str | None) -> tuple[Config, FileStorage]:
     return config, FileStorage(output_dir=config.output_dir)
 
 
+def _resolve_compare_input(value: str, output_dir: str) -> tuple[str, str]:
+    input_path = Path(value).expanduser()
+    if "/" in value or value.startswith(".") or value.startswith("~"):
+        return str(input_path), str(input_path)
+    return value, str(Path(output_dir) / value)
+
+
 def _print_run_summary(run_record: RunRecord) -> None:
     summary = json.loads(run_record["summary_json"]) if run_record.get("summary_json") else None
 
@@ -444,29 +451,46 @@ def cancel(
 
 @app.command()
 def compare(
-    base: str = typer.Option(..., help="Base run id"),
-    candidate: str = typer.Option(..., help="Candidate run id"),
-    config: str | None = typer.Option(None, help="Path to config.yaml"),
+    base: str = typer.Argument(..., help="Base run id or run artifact directory"),
+    candidate: str = typer.Argument(..., help="Candidate run id or run artifact directory"),
+    output_dir: str = typer.Option("./outputs", help="Directory containing run artifact folders"),
 ) -> None:
     """Compare two runs from exported artifacts."""
 
     try:
-        _, storage = _build_storage(config)
+        setup_logging("INFO")
+        storage = FileStorage(output_dir=output_dir)
+        base_label, base_path = _resolve_compare_input(base, output_dir)
+        candidate_label, candidate_path = _resolve_compare_input(candidate, output_dir)
         logger.info(
             "CLI compare command started",
-            extra={"event": "cli_compare_started", "base_run_id": base, "candidate_run_id": candidate},
+            extra={
+                "event": "cli_compare_started",
+                "base_input": base,
+                "candidate_input": candidate,
+                "base_path": base_path,
+                "candidate_path": candidate_path,
+            },
         )
         comparator = Comparator(storage)
-        result = comparator.compare_runs(base, candidate)
+        result = comparator.compare_run_dirs(base_path, candidate_path)
         logger.info(
             "CLI compare command completed",
-            extra={"event": "cli_compare_completed", "base_run_id": base, "candidate_run_id": candidate},
+            extra={
+                "event": "cli_compare_completed",
+                "base_run_id": base_label,
+                "candidate_run_id": candidate_label,
+            },
         )
         _print_compare_result(result)
     except EvalRunnerException as exc:
         logger.exception(
             "CLI compare command failed",
-            extra={"event": "cli_compare_failed", "base_run_id": base, "candidate_run_id": candidate},
+            extra={
+                "event": "cli_compare_failed",
+                "base_input": base,
+                "candidate_input": candidate,
+            },
         )
         console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(code=1)

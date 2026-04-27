@@ -126,6 +126,20 @@ def test_json_field_evaluator_uses_field_config() -> None:
     assert result.passed is True
 
 
+def test_json_field_evaluator_accepts_json_wrapped_in_code_fence() -> None:
+    clear_registry()
+    module = importlib.import_module("mini_llm_eval.evaluators.json_field")
+    evaluator = module.JsonFieldEvaluator()
+
+    result = evaluator.evaluate(
+        '```json\n{"answer":{"city":"Tokyo"}}\n```',
+        "Tokyo",
+        config={"field": "answer.city"},
+    )
+
+    assert result.passed is True
+
+
 def test_numeric_tolerance_evaluator_supports_percentage_tolerance() -> None:
     clear_registry()
     module = importlib.import_module("mini_llm_eval.evaluators.numeric_tolerance")

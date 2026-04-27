@@ -19,8 +19,15 @@ class Comparator:
     def compare_runs(self, base_run_id: str, candidate_run_id: str) -> CompareResult:
         """Compare two runs using their exported artifact files."""
 
-        base_meta, base_cases = self._load_run_artifacts(base_run_id)
-        candidate_meta, candidate_cases = self._load_run_artifacts(candidate_run_id)
+        base_meta, base_cases = self._load_run_artifacts_from_run_id(base_run_id)
+        candidate_meta, candidate_cases = self._load_run_artifacts_from_run_id(candidate_run_id)
+        return self.compare_artifacts(base_meta, base_cases, candidate_meta, candidate_cases)
+
+    def compare_run_dirs(self, base_run_dir: str | Path, candidate_run_dir: str | Path) -> CompareResult:
+        """Compare two runs using explicit artifact directories."""
+
+        base_meta, base_cases = self._load_run_artifacts_from_dir(Path(base_run_dir))
+        candidate_meta, candidate_cases = self._load_run_artifacts_from_dir(Path(candidate_run_dir))
         return self.compare_artifacts(base_meta, base_cases, candidate_meta, candidate_cases)
 
     def compare_artifacts(
@@ -99,8 +106,16 @@ class Comparator:
             tag_results=tag_results,
         )
 
-    def _load_run_artifacts(self, run_id: str) -> tuple[RunMeta, list[CaseResultArtifact]]:
-        run_dir = Path(self.file_storage.output_dir) / run_id
+    def _load_run_artifacts_from_run_id(
+        self,
+        run_id: str,
+    ) -> tuple[RunMeta, list[CaseResultArtifact]]:
+        return self._load_run_artifacts_from_dir(Path(self.file_storage.output_dir) / run_id)
+
+    def _load_run_artifacts_from_dir(
+        self,
+        run_dir: Path,
+    ) -> tuple[RunMeta, list[CaseResultArtifact]]:
         meta_path = run_dir / "meta.json"
         cases_path = run_dir / "case_results.jsonl"
 

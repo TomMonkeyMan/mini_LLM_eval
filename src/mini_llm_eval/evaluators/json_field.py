@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from mini_llm_eval.core.exceptions import EvaluatorError
@@ -19,6 +20,19 @@ def _resolve_field_path(payload: Any, field_path: str) -> Any:
             continue
         raise EvaluatorError(f"Field path not found in JSON payload: {field_path}")
     return current
+
+
+_CODE_FENCE_PATTERN = re.compile(
+    r"^\s*```(?:json|JSON)?\s*\n(?P<body>.*)\n```\s*$",
+    re.DOTALL,
+)
+
+
+def _normalize_json_output(output: str) -> str:
+    match = _CODE_FENCE_PATTERN.match(output)
+    if match is None:
+        return output.strip()
+    return match.group("body").strip()
 
 
 @register("json_field")
@@ -42,7 +56,7 @@ class JsonFieldEvaluator(BaseEvaluator):
             raise EvaluatorError("json_field evaluator requires config['field'] or case_metadata['json_field']")
 
         try:
-            parsed = json.loads(output)
+            parsed = json.loads(_normalize_json_output(output))
         except json.JSONDecodeError as exc:
             raise EvaluatorError(f"Output is not valid JSON: {exc}") from exc
 

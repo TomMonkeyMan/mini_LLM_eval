@@ -172,6 +172,45 @@ def test_comparator_tracks_fixed_and_missing_cases(tmp_path) -> None:
     assert result.summary.candidate_only_case_ids == ["case-3"]
 
 
+def test_comparator_can_compare_explicit_run_directories(tmp_path) -> None:
+    storage = FileStorage(output_dir=str(tmp_path / "outputs"))
+    comparator = Comparator(storage)
+
+    _write_run_artifacts(
+        storage,
+        "run-base",
+        [_build_case_result("run-base", "case-1", passed=True)],
+        pass_rate=1.0,
+        passed_cases=1,
+        failed_cases=0,
+        error_cases=0,
+        avg_latency_ms=1.0,
+        p95_latency_ms=1.0,
+        tag_pass_rates={"knowledge": {"total": 1, "passed": 1, "pass_rate": 1.0}},
+    )
+    _write_run_artifacts(
+        storage,
+        "run-candidate",
+        [_build_case_result("run-candidate", "case-1", passed=False)],
+        pass_rate=0.0,
+        passed_cases=0,
+        failed_cases=1,
+        error_cases=0,
+        avg_latency_ms=2.0,
+        p95_latency_ms=2.0,
+        tag_pass_rates={"knowledge": {"total": 1, "passed": 0, "pass_rate": 0.0}},
+    )
+
+    result = comparator.compare_run_dirs(
+        tmp_path / "outputs" / "run-base",
+        tmp_path / "outputs" / "run-candidate",
+    )
+
+    assert result.base_run_id == "run-base"
+    assert result.candidate_run_id == "run-candidate"
+    assert result.summary.newly_failed_case_ids == ["case-1"]
+
+
 def test_comparator_raises_for_missing_summary(tmp_path) -> None:
     storage = FileStorage(output_dir=str(tmp_path / "outputs"))
     comparator = Comparator(storage)

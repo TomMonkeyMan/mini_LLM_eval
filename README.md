@@ -250,11 +250,16 @@ mini-llm-eval cancel demo-run --config config.yaml --providers providers.yaml
 ### 8. 对比两次 run
 
 ```bash
-mini-llm-eval compare \
-  --base run-base \
-  --candidate run-candidate \
-  --config config.yaml
+mini-llm-eval compare run-base run-candidate
+mini-llm-eval compare run-base run-candidate --output-dir ./outputs
+mini-llm-eval compare ./outputs/run-base ./outputs/run-candidate
 ```
+
+说明：
+
+- `compare` 属于分析层，只依赖导出的 artifact，不依赖 provider / db / 运行时 config
+- 默认会在 `./outputs/<run_id>/` 下查找结果文件
+- 也可以直接传某个 run 的 artifact 目录
 
 当前 compare 基于导出的 `meta.json + case_results.jsonl`，会输出：
 

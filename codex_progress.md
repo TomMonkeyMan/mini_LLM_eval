@@ -174,6 +174,14 @@
   - `update_run_status()` now auto-populates `started_at` when entering `running`
   - terminal status updates now auto-populate `finished_at`
   - added regression coverage for timestamp writes on state transitions
+- Refined compare as an artifact-oriented analysis command:
+  - `compare` now accepts positional `run_id` arguments by default
+  - added `--output-dir` for locating artifact folders without runtime config
+  - added explicit run-directory compare support for fully decoupled analysis flows
+- Relaxed `json_field` parsing for real model outputs:
+  - accepts JSON payloads wrapped in Markdown code fences
+  - keeps strict JSON validation after fence normalization
+  - added regression coverage for fenced JSON responses
 - Added CLI tests covering:
   - listing recent runs
   - showing failed-only case results
