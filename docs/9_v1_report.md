@@ -104,7 +104,7 @@
 
 | 模块 | 状态 | 当前实现 |
 |------|------|----------|
-| 状态机 | 部分完成 | 没有单独的 `state_machine.py`，状态约束放在数据库层和 `RunStatus` 语义中 |
+| 状态机 | 部分完成 | 已有轻量 `state_machine.py` 集中状态流转规则，但仍未覆盖真实 `RUNNING` 中断语义 |
 | Aggregator | 部分完成 | 没有独立 `aggregator.py`，聚合逻辑在 `RunService._build_summary()` |
 | Provider 注册机制 | 部分完成 | 没有做 `ProviderRegistry`，改为 config-driven factory + plugin provider |
 | 日志系统实现方式 | 部分完成 | 没有采用 `structlog`，实际采用标准 `logging` JSON 输出 |
@@ -155,7 +155,7 @@
 
 有些能力已经存在，只是没有按早期文档里的模块拆分：
 
-- 状态机：实际在数据库层做状态合法性校验
+- 状态机：当前已抽成轻量 `state_machine.py`，数据库层调用其状态校验
 - 聚合器：实际在 `RunService` 中完成 summary 聚合
 - 持久化边界：实际拆成 `database.py` + `file_storage.py`
 

@@ -127,6 +127,14 @@
   - CLI `cancel` command
   - reliable for `PENDING` runs
   - explicit rejection for active `RUNNING` cancellation in v1
+- Extracted run status rules into `src/mini_llm_eval/services/state_machine.py`:
+  - centralized allowed run transitions
+  - database layer now delegates transition validation to the shared state-machine helper
+  - added dedicated state-machine tests
+- Added `docs/10_running_cancel_design.md` to define a real `RUNNING` cancel path:
+  - separate cancel request from final cancelled state
+  - propose DB-level cancel request fields
+  - propose executor cancel monitoring and task cancellation flow
 - Added CLI tests covering:
   - listing recent runs
   - showing failed-only case results

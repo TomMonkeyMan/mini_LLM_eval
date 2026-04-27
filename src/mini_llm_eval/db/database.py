@@ -8,9 +8,10 @@ from typing import Any
 
 import aiosqlite
 
-from mini_llm_eval.core.exceptions import InvalidTransitionError, PersistenceError
+from mini_llm_eval.core.exceptions import PersistenceError
 from mini_llm_eval.core.types import CaseResultRecord, RunRecord, StateLogRecord
 from mini_llm_eval.models.schemas import CaseResult, RunConfig, RunStatus
+from mini_llm_eval.services.state_machine import validate_run_transition
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
@@ -56,19 +57,6 @@ CREATE INDEX IF NOT EXISTS idx_case_results_run_id ON case_results(run_id);
 CREATE INDEX IF NOT EXISTS idx_case_results_status ON case_results(status);
 CREATE INDEX IF NOT EXISTS idx_state_logs_run_id ON state_logs(run_id);
 """
-
-_ALLOWED_TRANSITIONS: dict[str, set[str]] = {
-    RunStatus.PENDING.value: {RunStatus.RUNNING.value, RunStatus.CANCELLED.value},
-    RunStatus.RUNNING.value: {
-        RunStatus.SUCCEEDED.value,
-        RunStatus.FAILED.value,
-        RunStatus.CANCELLED.value,
-    },
-    RunStatus.SUCCEEDED.value: set(),
-    RunStatus.FAILED.value: set(),
-    RunStatus.CANCELLED.value: set(),
-}
-
 
 class Database:
     """Thin SQLite wrapper for run metadata and case result indexes."""
@@ -367,10 +355,7 @@ class Database:
         set_finished: bool = False,
     ) -> None:
         current_status = await self._get_current_status(db, run_id)
-        if new_status not in _ALLOWED_TRANSITIONS.get(current_status, set()):
-            raise InvalidTransitionError(
-                f"Invalid run status transition for {run_id}: {current_status} -> {new_status}"
-            )
+        validate_run_transition(run_id, current_status, new_status)
 
         assignments = ["status = ?", "updated_at = CURRENT_TIMESTAMP"]
         params: list[Any] = [new_status]
