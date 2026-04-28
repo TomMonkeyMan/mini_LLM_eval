@@ -94,6 +94,8 @@ mini-llm-eval show full-demo --failed-only --cases --config demo/quickstart/conf
 - 失败 case 展示
 - artifact 输出结构
 
+说明：由于这里使用的是 fallback mock provider，而不是为每条 case 单独准备结构化 mock 输出，部分 `json_field` / `regex` case 会失败或报错。这是预期现象，也正好用于演示框架对单 case 失败和 evaluator 异常的隔离能力。
+
 ### 1.5 运行测试
 
 ```bash
