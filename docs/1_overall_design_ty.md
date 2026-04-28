@@ -82,3 +82,9 @@ evaluator 异常
 * logging写好，json吧，后续splunk 或者 ES方便
 * 有点奇怪，为啥不是json输出呢。Markdown/HTML 还是给人看，渲染一下吧。还是存好json。测评报告 index 存sqlite吧。写个前端查看也行。
 
+
+
+
+* overall data flow
+* 
+

@@ -1,0 +1,216 @@
+# Codex Progress
+
+## 2026-04-22
+
+- Consolidated the v1 authority docs and aligned design/development references.
+- Added the initial Python package scaffold under `src/mini_llm_eval/`.
+- Added root project files: `pyproject.toml`, `README.md`, `config.yaml`, and `providers.yaml`.
+- Prepared empty `data/`, `demo/`, `outputs/`, and `tests/` directories for implementation work.
+- Created a new Miniconda environment: `mini-llm-eval` with Python 3.11.
+- Implemented foundational `core` and `models` modules:
+  - config loading with YAML + `${ENV_VAR}` expansion
+  - exception hierarchy
+  - shared Pydantic schemas and status enums
+- Added foundational tests for config loading and schema behavior.
+- Implemented evaluator base class, registry, auto-discovery, and 5 built-in rule evaluators.
+- Added evaluator tests for registration and rule behavior.
+- Implemented dataset loading with JSONL/JSON support and `eval_type -> eval_types` normalization.
+- Added a sample dataset at `data/eval_cases.jsonl` with 20 cases across multiple scenarios.
+- Added dataset tests for success and failure paths.
+- Verified editable install and passed `23` tests in the Conda environment.
+- Applied initial review fixes:
+  - completed runtime/test dependencies in `pyproject.toml`
+  - removed evaluator module `reload()` from normal discovery flow
+  - reset evaluator module cache only in test-oriented `clear_registry()`
+  - documented the `RunConfig.model_config` alias decision inline
+- Implemented Provider layer:
+  - `BaseProvider`
+  - retry helper
+  - factory
+  - `MockProvider`
+  - `OpenAICompatibleProvider` using `httpx.AsyncClient`
+- Added provider tests covering mock behavior, factory creation, retry logic, and OpenAI-compatible parsing.
+- Implemented storage layer:
+  - SQLite database schema for `runs`, `case_results`, and `state_logs`
+  - run lifecycle operations and state logging
+  - case result persistence and completed-case lookup
+  - file artifact writing for `case_results.jsonl` and `meta.json`
+  - safe fallback writing when the primary output directory is unavailable
+- Added storage tests for database lifecycle and artifact output.
+- Current verified test count: `34` passing in the Conda environment.
+- Next implementation target: executor and run service orchestration.
+
+## 2026-04-24
+
+- Incorporated Claude review #2 into the working notes.
+- Confirmed the Provider-layer review is directionally correct and non-blocking.
+- Chose not to interrupt the storage/execution roadmap for low-priority Provider refinements.
+- Deferred follow-ups from review #2:
+  - add explicit 5xx retry coverage for `OpenAICompatibleProvider`
+  - consider replacing `ProviderError(args[0])` error-code signaling with a clearer typed field
+  - document `ProviderConfig.extra` precedence more explicitly if configuration complexity grows
+- Current implementation status:
+  - foundations complete
+  - evaluators complete
+  - dataset loading complete
+  - provider layer complete
+  - storage layer complete
+- executor complete
+- run service complete
+- Added orchestration tests covering:
+  - executor writer-queue flow
+  - end-to-end `start_run`
+  - `resume_run` skipping completed cases
+- CLI complete
+- Added CLI commands:
+  - `run`
+  - `resume`
+  - `status`
+- Added CLI tests covering:
+  - end-to-end `run` + `status`
+  - `resume` on an already completed run
+- Fixed provider cleanup on RunService exception paths and added a regression test.
+- Current verified test count is now `40` passing in the Conda environment.
+- MVP status: core execution path is runnable end-to-end from the CLI.
+- Added a plugin-based Provider extension point:
+  - new provider type `plugin`
+  - dynamic loading from `plugins/*.py`
+  - user plugins only need to implement `async generate(query, config, **kwargs)`
+  - configuration-driven selection through `providers.yaml`
+- Added plugin-provider tests for successful loading and invalid plugin rejection.
+- Current verified test count remains `40` passing in the Conda environment.
+- Next implementation target: polish, docs, and optional follow-up fixes from review notes.
+
+## 2026-04-26
+
+- Reviewed `reviews/review_06_code_standards.md` and applied the highest-value fixes instead of broad style churn.
+- Added shared TypedDict record definitions in `src/mini_llm_eval/core/types.py` for:
+  - persisted run rows
+  - persisted case-result rows
+  - state-log rows
+  - run meta artifact shape
+- Updated `Database` typed return signatures to use structured record types instead of `dict[str, Any]`.
+- Updated `RunService._build_meta()` to return the shared `RunMeta` structure.
+- Consolidated CLI async execution so each command now uses a single `asyncio.run(...)` path instead of multiple event-loop entries.
+- Re-ran the full test suite in the Conda environment.
+- Current verified test count: `42` passing.
+- Added a minimal runtime logging system:
+  - new `core/logging.py` with JSON-line root logger setup
+  - new `log_level` config field with default `INFO`
+  - CLI now initializes logging from config
+- Added logging at key runtime boundaries:
+  - CLI command start / success / failure
+  - run start / complete / fail / resume
+  - batch execution start / complete
+  - provider retry / timeout / failure
+  - artifact fallback writes
+- Added logging tests for:
+  - JSON log formatting
+  - artifact fallback warning emission
+  - run lifecycle log events
+- Updated `README.md` and `config.yaml` to document runtime logging.
+- Current verified test count: `45` passing.
+- Added `docs/9_v1_report.md` to summarize:
+  - current v1 completion status
+  - mapping against historical `docs/3_plan_v0.1.md`
+  - deferred / replaced / still-pending work items
+- Rewrote `DEVELOPMENT.md` to align with current project reality:
+  - clarified document priority against `RULES.md` and `docs/7_v1_implementation_spec.md`
+  - removed idealized-but-unenforced rules
+  - separated hard constraints from recommendations and future tooling plans
+- Added CLI query commands for existing run data:
+  - `list` to show recent runs
+  - `show` to inspect a run and optionally display case-level results
+- Added database support for recent run listing.
+- Added minimal cancellation support:
+  - `RunService.cancel_run()`
+  - CLI `cancel` command
+  - reliable for `PENDING` runs
+  - explicit rejection for active `RUNNING` cancellation in v1
+- Extracted run status rules into `src/mini_llm_eval/services/state_machine.py`:
+  - centralized allowed run transitions
+  - database layer now delegates transition validation to the shared state-machine helper
+  - added dedicated state-machine tests
+- Added `docs/10_running_cancel_design.md` to define a real `RUNNING` cancel path:
+  - separate cancel request from final cancelled state
+  - propose DB-level cancel request fields
+  - propose executor cancel monitoring and task cancellation flow
+- Froze the current artifact contract for v1 output files:
+  - added explicit typed payloads for `case_results.jsonl`
+  - added explicit typed payloads for `meta.json` and run summary
+  - documented stable artifact fields in `README.md` and `docs/7_v1_implementation_spec.md`
+- Added artifact schema regression checks to ensure field stability.
+- Added provider / persistence exception-path coverage for:
+  - OpenAI-compatible timeout handling
+  - OpenAI-compatible retry exhaustion on 5xx
+  - plugin provider invalid return shape
+  - database save-case-result persistence wrapping
+- Current verified test count: `62` passing.
+- Started the compare layer as a separate analysis service:
+  - added `ComparisonError`
+  - added compare schemas in `models/schemas.py`
+  - added `services/comparator.py` for artifact-based run comparison
+  - compare currently works from `meta.json + case_results.jsonl`
+- Added compare tests covering:
+  - summary deltas
+  - newly failed / fixed case detection
+  - base-only / candidate-only case detection
+  - missing summary failure
+- Added CLI compare support:
+  - new `compare` command
+  - summary delta table
+  - tag pass-rate delta table
+  - case change summary table
+- Updated `README.md` and `docs/9_v1_report.md` to reflect compare availability.
+- Current verified test count: `66` passing.
+- Improved provider failure observability without suppressing transport logs:
+  - upgraded `ProviderError` to carry structured context
+  - provider warning logs now include `http_status`, `request_id`, and truncated `response_preview`
+  - retry logic now reads structured `error_code` from the exception object instead of positional args
+- Added provider logging regression tests for:
+  - structured 4xx error details
+  - truncated large error responses
+- Fixed run timestamp persistence for the normal execution path:
+  - `update_run_status()` now auto-populates `started_at` when entering `running`
+  - terminal status updates now auto-populate `finished_at`
+  - added regression coverage for timestamp writes on state transitions
+- Refined compare as an artifact-oriented analysis command:
+  - `compare` now accepts positional `run_id` arguments by default
+  - added `--output-dir` for locating artifact folders without runtime config
+  - added explicit run-directory compare support for fully decoupled analysis flows
+- Relaxed `json_field` parsing for real model outputs:
+  - accepts JSON payloads wrapped in Markdown code fences
+  - keeps strict JSON validation after fence normalization
+  - added regression coverage for fenced JSON responses
+- Added raw-requirement delivery completion artifacts:
+  - new `docs/12_raw_requirement_gap_report.md`
+  - consolidated project examples under `demo/`
+  - new `demo/` walkthrough with quickstart, sample dataset, two run artifacts, and compare example
+  - updated README to point to the demo entry
+- Added a minimal provider-level throttling framework:
+  - new `RateLimitedProvider` wrapper
+  - supports `provider_concurrency_limit`
+  - supports `requests_per_second`
+  - wired through provider factory without changing the executor contract
+  - added config/provider regression tests plus service/CLI verification
+- Expanded `docs/12_raw_requirement_gap_report.md` with an explicit robustness checklist:
+  - mapped the 7 raw-requirement exception classes to current behavior
+  - documented the distinction between case-level isolation and run-level fatal persistence failures
+- Added an artifact-driven report layer:
+  - new `Reporter` service for Markdown / HTML rendering
+  - supports single-run reports and compare reports
+  - added `report-run` and `report-compare` CLI commands
+  - added reporter and CLI regression tests
+  - updated README and gap-report wording to reflect basic report-export support
+- Updated `demo/` to cover the report layer:
+  - added generated sample Markdown reports under `demo/reports/`
+  - updated `demo/README.md` and `demo/compare_example.md` with report-export examples
+  - updated top-level README demo links to include report artifacts
+- Added CLI tests covering:
+  - listing recent runs
+  - showing failed-only case results
+  - cancelling a pending run
+  - rejecting active running cancellation
+- Updated `README.md` to document `list` and `show`.
+- Updated `README.md` to document `cancel` and its v1 limitation.
+- Current verified test count: `50` passing for the last full run; targeted `services + cli` tests also pass after cancel support.

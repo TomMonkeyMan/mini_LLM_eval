@@ -1,5 +1,7 @@
 # Mini LLM Eval 关键设计决策
 
+> 说明：本文件保留关键设计讨论结果，但 v1 实现落地请以 `docs/7_v1_implementation_spec.md` 为准。
+
 > 本文档记录最终敲定的核心设计决策，作为实现的权威依据。
 >
 > 状态说明：✅ 已确定 | ⬜ 待讨论（有建议）
@@ -184,26 +186,30 @@ python -m src.cli.main run --dataset data/cases.jsonl --provider qwen
 - Provider 初始化失败（如 API key 无效）
 
 **Run 状态**：
-- 部分 case 失败 → run 状态为 `COMPLETED`，结果记录失败数
+- 部分 case 失败 → run 状态为 `SUCCEEDED`，结果记录失败数
 
 ---
 
 ### 4.3 存储设计 ✅
 
 **1. 大文本存储：索引 + 文件分离**
-- 数据库存索引/路径
-- 大文本（actual_output、完整 JSON 结果）存本地文件
+- 数据库是运行态和元数据的权威来源
+- 文件产物用于导出和后续离线分析
 - 后续可迁移到 ES/OpenSearch/S3
 
 ```
 outputs/
   {run_id}/
-    case_001_output.json
-    case_002_output.json
-    ...
+    case_results.jsonl
+    meta.json
 ```
 
 **2. JSON 字段**：使用 SQLite JSON 列，灵活不用频繁改 schema
+
+其中：
+- `case_results.jsonl` 保存 case 级详细结果
+- `meta.json` 是 run 完成后导出的便携快照
+- 运行中若 DB 与 `meta.json` 不一致，以 DB 为准
 
 **3. 断点恢复：run_id + status**
 
