@@ -13,7 +13,7 @@
 - 对比两次实验结果
 - 导出 Markdown / HTML 报告
 
-## 1. 给评审的最快上手方式
+## 1. 安装与演示
 
 ### 1.1 安装
 
@@ -27,7 +27,7 @@ python -m pip install -e ".[dev]"
 mini-llm-eval --help
 ```
 
-### 1.2 零 API Key 演示：直接对比两次样例 run
+### 1.2 无 API Key 演示：直接对比两次样例 run
 
 仓库内已经提供了两份固定产物，适合评审直接验证 compare/report 主链路：
 
@@ -44,7 +44,7 @@ mini-llm-eval report-compare \
   --format markdown
 ```
 
-### 1.3 本地跑一次真实评测任务：使用 mock provider
+### 1.3 无 API Key 演示，本地跑一次真实评测任务：使用 mock provider
 
 这是最简单的“从数据集到运行结果”的本地闭环，不依赖外部模型服务：
 
@@ -88,13 +88,13 @@ mini-llm-eval status full-demo --config demo/quickstart/config.yaml
 mini-llm-eval show full-demo --failed-only --cases --config demo/quickstart/config.yaml
 ```
 
-这个命令仍然使用 quickstart 里的 mock provider 配置，但数据集换成了主评测集，因此更适合演示：
+这个命令仍然使用 quickstart 里的 mock provider 配置，但数据集换成了主评测集：
 
 - evaluator 覆盖面
 - 失败 case 展示
 - artifact 输出结构
 
-说明：由于这里使用的是 fallback mock provider，而不是为每条 case 单独准备结构化 mock 输出，部分 `json_field` / `regex` case 会失败或报错。这是预期现象，也正好用于演示框架对单 case 失败和 evaluator 异常的隔离能力。
+说明：由于这里使用的是 fallback mock provider，而不是为每条 case 单独准备结构化 mock 输出，部分 `json_field` / `regex` case 会失败或报错。这是预期现象，用于演示框架对单 case 失败和 evaluator 异常的隔离能力。
 
 ### 1.5 运行测试
 
@@ -104,7 +104,7 @@ python -m pytest
 
 ---
 
-## 2. 题目要求完成情况
+## 2. 要求完成情况
 
 ### 2.1 本地评测数据集
 
@@ -268,7 +268,7 @@ CLI 入口位于：
 
 ## 3. 选择深入实现的开放方向
 
-除了基本要求外，这个版本实际覆盖了多个“深入方向”：
+本版本覆盖了多个“方向”，但均基于单机MVP进行设计，避免过度工程化：
 
 ### A. 任务状态机
 
@@ -470,7 +470,7 @@ CLI 本身不是业务逻辑中心，而是这些层的组合入口。
 
 如果平台强行把接入方式收敛到单一 OpenAI-compatible 协议，虽然主链路更简单，但会明显限制使用自由度。
 
-因此这里额外提供了 `plugin` provider：
+因此这里额外提供了 `plugin` provider，参考了lua可插拔的设计（provider本身也是类似于网关）：
 
 - 用户可以通过一个轻量脚本自定义请求逻辑
 - 自己决定 endpoint、payload 和响应解析方式
@@ -782,10 +782,10 @@ outputs/
 
 本项目开发过程中使用了 AI 辅助工具：
 
-- Codex
-- Claude / Claude Code
+- Codex (gpt-4.5)
+- Claude / Claude Code (opus-4.6)
 
-协作方式大致如下：
+协作方式如下：
 
 - 我负责整体框架设计、核心接口划分和关键 tradeoff 决策
 - 我负责和 Claude 讨论实现细节，收敛最终设计方案
@@ -824,8 +824,8 @@ AI 主要帮助的部分：
 主设计文档可优先看：
 
 - [`docs/1_overall_design_ty.md`](docs/1_overall_design_ty.md)
-- [`docs/7_v1_implementation_spec.md`](docs/7_v1_implementation_spec.md)
 - [`docs/5_critical_design.md`](docs/5_critical_design.md)
+- [`docs/7_v1_implementation_spec.md`](docs/7_v1_implementation_spec.md)
 
 如果想看更完整的设计演化过程，也可以继续看 `docs/` 下的其他文档。
 
