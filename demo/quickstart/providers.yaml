@@ -1,7 +1,10 @@
 # Mock Provider - 用于测试，无需 API
-mock-echo:
+mock-demo:
   type: mock
-  mode: echo
+  fallback:
+    enabled: true
+    success_rate: 1.0
+    default_response: ""
 
 # Plugin Provider - 自定义模型调用
 my-plugin:

@@ -53,11 +53,13 @@ cd demo/quickstart
 
 mini-llm-eval run \
   --dataset data/sample.jsonl \
-  --provider mock-echo \
+  --provider mock-demo \
   --run-id demo-quickstart \
   --config config.yaml \
   --providers providers.yaml
 ```
+
+这里的 `mock-demo` 使用当前实现已支持的 `fallback` 配置，在 quickstart 示例里会直接返回 case 的 `expected_answer`，用于离线验证执行链路。
 
 查看运行结果：
 
@@ -230,7 +232,7 @@ CLI 入口位于：
 - evaluator 异常
 - 单个 case 失败
 - 并发执行中的部分失败
-- 结果文件写入失败（带 fallback）
+- artifact 结果文件写入失败（带 fallback）
 
 目标是：**单条 case 出错不会让整个 run 失效**。
 

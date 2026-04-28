@@ -22,16 +22,26 @@ quickstart/
 cd demo/quickstart
 
 # 2. 运行评测（使用 mock provider）
-mini-llm-eval run --dataset data/sample.jsonl --provider mock-echo
+mini-llm-eval run \
+  --dataset data/sample.jsonl \
+  --provider mock-demo \
+  --run-id demo-quickstart \
+  --config config.yaml \
+  --providers providers.yaml
 
 # 3. 运行评测（使用自定义 plugin）
-mini-llm-eval run --dataset data/sample.jsonl --provider my-plugin
+mini-llm-eval run \
+  --dataset data/sample.jsonl \
+  --provider my-plugin \
+  --run-id demo-plugin \
+  --config config.yaml \
+  --providers providers.yaml
 
 # 4. 查看结果
-mini-llm-eval status <run-id>
+mini-llm-eval status demo-quickstart --config config.yaml
 
 # 5. 查看输出文件
-ls outputs/<run-id>/
+ls outputs/demo-quickstart/
 ```
 
 ## 配置说明
@@ -40,9 +50,12 @@ ls outputs/<run-id>/
 
 ```yaml
 # Mock Provider - 测试用
-mock-echo:
+mock-demo:
   type: mock
-  mode: echo
+  fallback:
+    enabled: true
+    success_rate: 1.0
+    default_response: ""
 
 # Plugin Provider - 自定义模型
 my-plugin:
@@ -59,6 +72,8 @@ my-plugin:
 ```
 
 ### 自定义 Plugin
+
+`mock-demo` 使用当前 `MockProvider` 已支持的 `fallback` 机制，在找不到显式 mapping 时直接返回 case 的 `expected_answer`，这样可以离线验证 run/status/show 主链路。
 
 用户只需实现一个 `generate` 函数：
 
