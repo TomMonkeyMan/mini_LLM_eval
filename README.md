@@ -68,7 +68,33 @@ mini-llm-eval status demo-quickstart --config config.yaml
 mini-llm-eval show demo-quickstart --cases --config config.yaml
 ```
 
-### 1.4 运行测试
+### 1.4 Full Demo：使用主评测集跑一次完整 run
+
+如果你想直接使用仓库内主评测集 [`data/eval_cases.jsonl`](data/eval_cases.jsonl) 做一次更完整的离线演示，可以在仓库根目录运行：
+
+```bash
+mini-llm-eval run \
+  --dataset data/eval_cases.jsonl \
+  --provider mock-demo \
+  --run-id full-demo \
+  --config demo/quickstart/config.yaml \
+  --providers demo/quickstart/providers.yaml
+```
+
+查看结果：
+
+```bash
+mini-llm-eval status full-demo --config demo/quickstart/config.yaml
+mini-llm-eval show full-demo --failed-only --cases --config demo/quickstart/config.yaml
+```
+
+这个命令仍然使用 quickstart 里的 mock provider 配置，但数据集换成了主评测集，因此更适合演示：
+
+- evaluator 覆盖面
+- 失败 case 展示
+- artifact 输出结构
+
+### 1.5 运行测试
 
 ```bash
 python -m pytest
